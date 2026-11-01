@@ -5,3 +5,19 @@
 - 계약 파일은 만들 수만 있다: 에이전트는 테스트 · hurl · 명세를 추가할 수는 있어도 고치거나 지우지 못한다.
 - 의존성은 사람 몫이다: go.mod · Cargo.toml · package.json이 바뀌면 PR 없이 빨강으로 끝난다.
 - 코드가 아니라 PR을 읽는다: `nightcap:read-pr`은 본문과 위험 목록만 보면 되고, `nightcap:read-code`는 diff까지 읽는다.
+
+## 설정
+
+바이너리 옆에 `nightcap.yml`을 쓰고(gitignore 대상) 그 폴더에서 `nightcap run`을 친다. 계획 문서 하나가 항목 하나:
+
+```yaml
+work_start: "09:00"        # 이 시각 5시간 전부터는 새 사용량 창을 열지 않는다
+max_turns: 30
+max_rounds: 3
+targets:
+  - plan: ~/work/todolist/blog-v2/github-rank-commit.md
+    repo: ~/workspace/apps-web/blog-v2
+    check: make check
+    read_code: [services/go-api/internal/auth/*]
+    lang: [en, ko]            # PR 본문 언어, 기본값 [ko]
+```

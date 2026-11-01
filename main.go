@@ -9,7 +9,7 @@ import (
 	"nightcap/internal/cmd/status"
 )
 
-const usage = "usage: nightcap run <repo> [--section <title>] | nightcap status <repo>\n"
+const usage = "usage: nightcap run [plan] [--section <title>] | nightcap status [plan]\n"
 
 func main() {
 	os.Exit(dispatch(os.Args[1:], os.Stdout, os.Stderr))

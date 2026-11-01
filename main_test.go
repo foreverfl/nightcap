@@ -2,16 +2,23 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"testing"
 )
 
-func TestDispatchRunPrintsRepoPath(t *testing.T) {
+func TestDispatchRunPrintsTargets(t *testing.T) {
+	t.Chdir(t.TempDir())
+	yml := []byte("targets:\n  - plan: docs/plan.md\n    repo: /tmp/repo\n    check: make check\n")
+	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	var stdout, stderr bytes.Buffer
-	code := dispatch([]string{"run", "/tmp/x"}, &stdout, &stderr)
+	code := dispatch([]string{"run"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	if stdout.String() != "repo: /tmp/x\n" {
+	want := "max_turns: 30  max_rounds: 3  work_start: 09:00\ntarget: docs/plan.md -> /tmp/repo (make check)\n"
+	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
