@@ -1,0 +1,18 @@
+package config
+
+// Config is nightcap.yml in the current folder: shared limits plus one Target per plan file.
+type Config struct {
+	MaxTurns  int      `yaml:"max_turns"`
+	MaxRounds int      `yaml:"max_rounds"`
+	WorkStart string   `yaml:"work_start"` // "HH:MM" local time
+	Targets   []Target `yaml:"targets"`
+}
+
+// Target pairs one plan file with the repo its units commit to.
+type Target struct {
+	Plan     string   `yaml:"plan"`
+	Repo     string   `yaml:"repo"`
+	Check    string   `yaml:"check"`
+	ReadCode []string `yaml:"read_code"` // path globs that always demote a PR to read-code
+	Lang     []string `yaml:"lang"`      // PR body languages, e.g. [ko] or [en, ko]
+}
