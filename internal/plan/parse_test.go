@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -80,5 +81,27 @@ func TestPickByName(t *testing.T) {
 	section, ok := Pick(Parse(oneSection()+"\n"+second), "home-feed-2")
 	if !ok || section.Slug != "home-feed-2" {
 		t.Fatalf("got %q, %v; want home-feed-2", section.Slug, ok)
+	}
+}
+
+func TestParseReadsExamplePlans(t *testing.T) {
+	for _, path := range []string{"../../examples/plan.md", "../../examples/plan-ko.md"} {
+		text, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sections := Parse(string(text))
+		if len(sections) != 1 {
+			t.Fatalf("%s: got %d sections, want 1", path, len(sections))
+		}
+		checked := 0
+		for _, unit := range sections[0].Units {
+			if unit.HasCheck {
+				checked++
+			}
+		}
+		if len(sections[0].Units) != 3 || checked != 2 {
+			t.Fatalf("%s: got %d units, %d with a check; want 3 and 2", path, len(sections[0].Units), checked)
+		}
 	}
 }

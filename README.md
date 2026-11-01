@@ -8,6 +8,8 @@ Runs Claude Code overnight against one heading of a plan file, one unit at a tim
 
 ## Setup
 
+Plan files follow [docs/plan-format.md](docs/plan-format.md); copy [examples/plan.md](examples/plan.md) to start.
+
 Write `nightcap.yml` next to the binary (it is gitignored) and run `nightcap run` from that folder. One target per plan file:
 
 ```yaml

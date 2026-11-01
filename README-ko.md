@@ -8,6 +8,8 @@
 
 ## 설정
 
+계획 파일 모양은 [docs/plan-format-ko.md](docs/plan-format-ko.md). [examples/plan-ko.md](examples/plan-ko.md)를 복사해서 시작한다.
+
 바이너리 옆에 `nightcap.yml`을 쓰고(gitignore 대상) 그 폴더에서 `nightcap run`을 친다. 계획 문서 하나가 항목 하나:
 
 ```yaml
