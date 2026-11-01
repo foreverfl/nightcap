@@ -6,9 +6,13 @@ import (
 	"testing"
 )
 
-func TestDispatchRunPrintsTargets(t *testing.T) {
+func TestDispatchRunPrintsPickedSection(t *testing.T) {
 	t.Chdir(t.TempDir())
-	yml := []byte("targets:\n  - plan: docs/plan.md\n    repo: /tmp/repo\n    check: make check\n")
+	planText := []byte("## feat: feed (feed)\n\n- [ ] add it\n  - DONE  go test passes\n")
+	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	yml := []byte("targets:\n  - plan: plan.md\n    repo: /tmp/repo\n    check: make check\n")
 	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -17,7 +21,7 @@ func TestDispatchRunPrintsTargets(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	want := "max_turns: 30  max_rounds: 3  work_start: 09:00\ntarget: docs/plan.md -> /tmp/repo (make check)\n"
+	want := "plan.md\n  branch: feat/feed\n  take  add it\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
