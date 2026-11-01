@@ -7,12 +7,14 @@ import (
 	"os"
 
 	"nightcap/internal/config"
+	"nightcap/internal/git"
 	"nightcap/internal/plan"
 )
 
 // Run is the "run" subcommand; args is everything after "run", where --section names one heading.
-// For now it only prints, per target, which heading and which units tonight's run would take,
-// and returns an error when the config or a plan file does not load.
+// For now it prints, per target, which heading and units tonight's run would take and
+// checks that heading's branch out in a worktree; it returns an error when the config,
+// a plan file or git fails.
 func Run(args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	sectionName := flags.String("section", "", "heading title or slug to take")
@@ -33,7 +35,12 @@ func Run(args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, "%s: nothing to take\n", target.Plan)
 			continue
 		}
-		fmt.Fprintf(stdout, "%s\n  branch: %s/%s\n", target.Plan, section.Type, section.Slug)
+		branch := section.Type + "/" + section.Slug
+		dir, err := git.AddWorktree(target.Repo, branch, section.Slug)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", target.Plan, branch, dir)
 		for _, unit := range section.Units {
 			mark := "skip"
 			if unit.HasCheck {
