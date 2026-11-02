@@ -70,10 +70,9 @@ func Run(args []string, stdout io.Writer) error {
 	return nil
 }
 
-// runUnit runs claude and then the check on one unit, up to MaxRounds times, feeding the failing
-// check's tail into the next prompt. It prints one "ran" and one "check" line per round, and
-// "blocked" when the rounds run out or claude stops before Done; it returns an error when
-// claude or sh cannot run.
+// runUnit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail into the next prompt.
+// It prints "blocked" when the rounds run out, the same tail comes back twice in a row, or claude stops before Done.
+// It returns an error only when claude or sh cannot run.
 func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, slug string, number int, unit plan.Unit) error {
 	failureTail := ""
 	for round := 1; round <= loaded.MaxRounds; round++ {
@@ -93,6 +92,10 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
 		if checked.Green {
 			return nil
+		}
+		sameFailureAsLastRound := round > 1 && checked.Tail == failureTail
+		if sameFailureAsLastRound {
+			break
 		}
 		failureTail = checked.Tail
 	}

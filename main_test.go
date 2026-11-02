@@ -67,7 +67,7 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 		"targets:",
 		"  - plan: plan.md",
 		"    repo: " + repo,
-		"    check: false",
+		"    check: echo $$; false",
 	}, "\n"))
 	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
 		t.Fatal(err)
@@ -82,6 +82,29 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 	}
 	if !strings.HasSuffix(stdout.String(), "  check: red\n  blocked\n") {
 		t.Fatalf("stdout should end with a red check and blocked, got %q", stdout.String())
+	}
+}
+
+func TestRunMarksUnitBlockedWhenTheSameFailureRepeats(t *testing.T) {
+	repo := oneTarget(t)
+	useFakeClaude(t)
+	yml := []byte(strings.Join([]string{
+		"max_rounds: 3",
+		"targets:",
+		"  - plan: plan.md",
+		"    repo: " + repo,
+		"    check: false",
+	}, "\n"))
+	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
+	if len(logs) != 2 {
+		t.Fatalf("`false` fails the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
 }
 
