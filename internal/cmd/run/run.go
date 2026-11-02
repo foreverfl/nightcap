@@ -72,7 +72,7 @@ func Run(args []string, stdout io.Writer) error {
 
 // runUnit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail into the next prompt.
 // It prints "blocked" when the rounds run out, the same tail comes back twice in a row, or claude stops before Done.
-// It returns an error only when claude or sh cannot run.
+// On green it prints the files the branch changed. It returns an error only when claude, sh or git cannot run.
 func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, slug string, number int, unit plan.Unit) error {
 	failureTail := ""
 	for round := 1; round <= loaded.MaxRounds; round++ {
@@ -91,6 +91,13 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		}
 		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
 		if checked.Green {
+			changes, err := git.ChangedFiles(dir)
+			if err != nil {
+				return err
+			}
+			for _, change := range changes {
+				fmt.Fprintf(stdout, "  %s %s\n", change.Status, change.Path)
+			}
 			return nil
 		}
 		sameFailureAsLastRound := round > 1 && checked.Tail == failureTail
