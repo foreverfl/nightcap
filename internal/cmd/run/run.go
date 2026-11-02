@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 
+	"nightcap/internal/check"
 	"nightcap/internal/client/claude"
 	"nightcap/internal/config"
 	"nightcap/internal/git"
@@ -17,8 +18,8 @@ import (
 
 // Run is the "run" subcommand; args is everything after "run", where --section names one heading.
 // For now it picks tonight's heading per target, checks its branch out in a worktree and runs
-// one claude round on the first unit that has a check; it returns an error when the config,
-// a plan file, git or claude fails.
+// one claude round on the first unit that has a check, then the target's check command when that
+// round ended Done; it returns an error when the config, a plan file, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	sectionName := flags.String("section", "", "heading title or slug to take")
@@ -67,8 +68,23 @@ func Run(args []string, stdout io.Writer) error {
 				return err
 			}
 			fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", unit.Title, result.Outcome, logPath)
+			if result.Outcome == claude.Done {
+				checked, err := check.Run(ctx, dir, target.Check)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
+			}
 			break
 		}
 	}
 	return nil
+}
+
+// color names a check result the way the plan file does: "green" for pass, "red" for fail.
+func color(green bool) string {
+	if green {
+		return "green"
+	}
+	return "red"
 }
