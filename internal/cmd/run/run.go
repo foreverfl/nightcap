@@ -98,6 +98,12 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 			for _, change := range changes {
 				fmt.Fprintf(stdout, "  %s %s\n", change.Status, change.Path)
 			}
+			verdict := check.Classify(changes)
+			if verdict.Red {
+				fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
+			} else {
+				fmt.Fprintln(stdout, "  verdict: green")
+			}
 			return nil
 		}
 		sameFailureAsLastRound := round > 1 && checked.Tail == failureTail
