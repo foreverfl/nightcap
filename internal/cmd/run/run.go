@@ -18,8 +18,8 @@ import (
 
 // Run is the "run" subcommand; args is everything after "run", where --section names one heading.
 // For now it picks tonight's heading per target, checks its branch out in a worktree and runs
-// one claude round on the first unit that has a check, then the target's check command when that
-// round ended Done; it returns an error when the config, a plan file, git, claude or sh fails.
+// the first unit that has a check through runUnit; it returns an error when the config,
+// a plan file, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	sectionName := flags.String("section", "", "heading title or slug to take")
@@ -61,23 +61,42 @@ func Run(args []string, stdout io.Writer) error {
 			if !unit.HasCheck {
 				continue
 			}
-			logPath := filepath.Join(target.Repo, ".nightcap", "logs", section.Slug, fmt.Sprintf("unit%d-round1.log", index+1))
-			prompt := BuildPrompt(unit.Body, "")
-			result, err := claude.RunRound(ctx, dir, prompt, loaded.MaxTurns, loaded.AllowedTools, logPath)
-			if err != nil {
+			if err := runUnit(ctx, stdout, loaded, target, dir, section.Slug, index+1, unit); err != nil {
 				return err
-			}
-			fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", unit.Title, result.Outcome, logPath)
-			if result.Outcome == claude.Done {
-				checked, err := check.Run(ctx, dir, target.Check)
-				if err != nil {
-					return err
-				}
-				fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
 			}
 			break
 		}
 	}
+	return nil
+}
+
+// runUnit runs claude and then the check on one unit, up to MaxRounds times, feeding the failing
+// check's tail into the next prompt. It prints one "ran" and one "check" line per round, and
+// "blocked" when the rounds run out or claude stops before Done; it returns an error when
+// claude or sh cannot run.
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, slug string, number int, unit plan.Unit) error {
+	failureTail := ""
+	for round := 1; round <= loaded.MaxRounds; round++ {
+		logPath := filepath.Join(target.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
+		result, err := claude.RunRound(ctx, dir, BuildPrompt(unit.Body, failureTail), loaded.MaxTurns, loaded.AllowedTools, logPath)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", unit.Title, result.Outcome, logPath)
+		if result.Outcome != claude.Done {
+			break
+		}
+		checked, err := check.Run(ctx, dir, target.Check)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
+		if checked.Green {
+			return nil
+		}
+		failureTail = checked.Tail
+	}
+	fmt.Fprintln(stdout, "  blocked")
 	return nil
 }
 

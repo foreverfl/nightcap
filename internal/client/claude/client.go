@@ -15,6 +15,7 @@ import (
 // The binary is $NIGHTCAP_CLAUDE when set, so tests can swap in a fake one.
 // It returns an error when claude cannot start, the log cannot be written, or the output is not a result JSON.
 func RunRound(ctx context.Context, dir, prompt string, maxTurns int, allowedTools []string, logPath string) (Result, error) {
+	// Test only: main_test.go sets NIGHTCAP_CLAUDE to a fake script; a real run leaves it empty.
 	binary := os.Getenv("NIGHTCAP_CLAUDE")
 	if binary == "" {
 		binary = "claude"
