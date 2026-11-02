@@ -1,17 +1,30 @@
 package status
 
 import (
-	"errors"
 	"fmt"
 	"io"
+
+	"nightcap/internal/config"
+	"nightcap/internal/git"
 )
 
-// Run is the "status" subcommand; args is everything after "status".
-// For now it only prints the target repo path, and returns an error when the path is missing.
+// Run is the "status" subcommand; args is everything after "status" (unused yet).
+// For now it prints each target repo with its worktrees, and returns an error
+// when the config does not load or git fails.
 func Run(args []string, stdout io.Writer) error {
-	if len(args) == 0 {
-		return errors.New("status: repo path is required")
+	loaded, err := config.Load(".")
+	if err != nil {
+		return err
 	}
-	fmt.Fprintln(stdout, "repo:", args[0])
+	for _, target := range loaded.Targets {
+		worktrees, err := git.ListWorktrees(target.Repo)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, target.Repo)
+		for _, line := range worktrees {
+			fmt.Fprintln(stdout, "  "+line)
+		}
+	}
 	return nil
 }

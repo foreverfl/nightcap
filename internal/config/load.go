@@ -12,6 +12,13 @@ import (
 
 const FileName = "nightcap.yml"
 
+// defaultAllowedTools lets the agent read, edit and run local checks and commits, but not push.
+var defaultAllowedTools = []string{
+	"Read", "Edit", "Write", "Glob", "Grep",
+	"Bash(go:*)", "Bash(make:*)", "Bash(hurl:*)", "Bash(cargo:*)", "Bash(npm test:*)",
+	"Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)",
+}
+
 // Load reads <dir>/nightcap.yml, fills missing keys with defaults
 // (max_turns 30, max_rounds 3, work_start 09:00, lang [ko] per target) and expands a leading "~/" in plan and repo.
 // It returns an error when the file is unreadable or malformed, targets is empty,
@@ -21,7 +28,7 @@ func Load(dir string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	config := Config{MaxTurns: 30, MaxRounds: 3, WorkStart: "09:00"}
+	config := Config{MaxTurns: 30, MaxRounds: 3, WorkStart: "09:00", AllowedTools: defaultAllowedTools}
 	if err := yaml.Unmarshal(raw, &config); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", FileName, err)
 	}

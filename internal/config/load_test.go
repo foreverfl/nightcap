@@ -27,7 +27,7 @@ func TestLoadFillsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Config{MaxTurns: 30, MaxRounds: 3, WorkStart: "09:00",
+	want := Config{MaxTurns: 30, MaxRounds: 3, WorkStart: "09:00", AllowedTools: defaultAllowedTools,
 		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check", Lang: []string{"ko"}}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
