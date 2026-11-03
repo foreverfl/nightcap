@@ -1,6 +1,7 @@
 package pr
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -62,5 +63,16 @@ func TestBuildBodyWithNothingRiskySaysNone(t *testing.T) {
 	}
 	if risk := riskSection(body); risk != "- 없음\n" {
 		t.Fatalf("with nothing risky the risk section should say 없음, got %q", risk)
+	}
+}
+
+func TestBuildBilingualBodyWithoutTranslationSaysEnglishIsMissing(t *testing.T) {
+	failingTranslate := func(korean string) (string, error) { return "", errors.New("claude down") }
+	body, err := BuildBilingualBody(BodyInput{}, failingTranslate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if risk := riskSection(body); risk != "- 영문 없음\n" {
+		t.Fatalf("a failed translation should leave only 영문 없음 in the risk section, got %q", risk)
 	}
 }

@@ -7,6 +7,9 @@
 {{- end}}
 
 ## 위험
+{{- if .IsMissingEnglish}}
+- 영문 없음
+{{- end}}
 {{- range .Units}}
   {{- if .ReadCodeReason}}
 - 코드까지 읽어야 함: {{.ReadCodeReason}}

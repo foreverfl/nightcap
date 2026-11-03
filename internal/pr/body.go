@@ -26,12 +26,14 @@ type BodyInput struct {
 	Units     []BodyUnit
 	Risks     []string
 	CheckTail string
+
+	IsMissingEnglish bool // translation failed, so the risk section opens with "영문 없음"
 }
 
-// HasNoRisk reports whether the risk section would be empty: no read-code reason and no risk line.
+// HasNoRisk reports whether the risk section would be empty: no missing English, no read-code reason and no risk line.
 func (input BodyInput) HasNoRisk() bool {
 	hasReadCode := slices.ContainsFunc(input.Units, func(unit BodyUnit) bool { return unit.ReadCodeReason != "" })
-	return !hasReadCode && len(input.Risks) == 0
+	return !input.IsMissingEnglish && !hasReadCode && len(input.Risks) == 0
 }
 
 // BuildBody fills prompts/pr.md with input and returns the Korean half of the PR description.
@@ -42,4 +44,20 @@ func BuildBody(input BodyInput) (string, error) {
 		return "", err
 	}
 	return body.String(), nil
+}
+
+// BuildBilingualBody returns the English description translated from the Korean one, a "---", then the Korean one.
+// When translate fails it returns the Korean one alone with "영문 없음" first in the risk section;
+// it returns an error only when the template cannot be filled.
+func BuildBilingualBody(input BodyInput, translate func(korean string) (string, error)) (string, error) {
+	korean, err := BuildBody(input)
+	if err != nil {
+		return "", err
+	}
+	english, translateErr := translate(korean)
+	if translateErr != nil {
+		input.IsMissingEnglish = true
+		return BuildBody(input)
+	}
+	return english + "\n\n---\n\n" + korean, nil
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"nightcap/internal/check"
@@ -95,7 +96,7 @@ func Run(args []string, stdout io.Writer) error {
 			if err := runUnit(ctx, stdout, loaded, target, dir, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
-			if err := openDraftPR(stdout, statePath, dir, section, unit.Title, hasPR[section.Slug]); err != nil {
+			if err := openDraftPR(ctx, stdout, statePath, dir, section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
 				return err
 			}
 			break
@@ -194,9 +195,10 @@ func classifyBranch(stdout io.Writer, dir string, target config.Target, unit pla
 	return verdict, nil
 }
 
-// openDraftPR pushes section's branch from dir and opens a draft PR once unitTitle has ended green or read-code
-// in the state file at statePath, with a description of every finished unit; with hasPR it replaces that PR's description instead. It returns an error when git, gh or the state file fails.
-func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, unitTitle string, hasPR bool) error {
+// openDraftPR pushes section's branch from dir once unitTitle has ended green or read-code in the state file at statePath,
+// then opens a draft PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
+// isEnglishWanted). It returns an error when git, gh or the state file fails.
+func openDraftPR(ctx context.Context, stdout io.Writer, statePath, dir string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -220,7 +222,13 @@ func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, 
 	}
 	input := bodyInput(section, saved.Sections[section.Slug], unitTitle)
 	input.Risks = pr.RiskLines(changes, addedLines)
-	body, err := pr.BuildBody(input)
+	var body string
+	if isEnglishWanted {
+		translate := func(korean string) (string, error) { return claude.Translate(ctx, korean) }
+		body, err = pr.BuildBilingualBody(input, translate)
+	} else {
+		body, err = pr.BuildBody(input)
+	}
 	if err != nil {
 		return err
 	}
