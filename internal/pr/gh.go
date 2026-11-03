@@ -29,7 +29,12 @@ func runGhWithBody(dir, body string, argsFor func(bodyPath string) []string) (st
 	if closeErr := bodyFile.Close(); writeErr != nil || closeErr != nil {
 		return "", errors.Join(writeErr, closeErr)
 	}
-	args := argsFor(bodyFile.Name())
+	return runGh(dir, argsFor(bodyFile.Name())...)
+}
+
+// runGh runs gh in dir with args and returns what it printed on stdout, trimmed.
+// It returns an error with gh's stderr attached when gh fails.
+func runGh(dir string, args ...string) (string, error) {
 	command := exec.Command(ghBinary(), args...)
 	command.Dir = dir
 	output, err := command.Output()

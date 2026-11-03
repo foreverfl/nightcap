@@ -97,6 +97,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 		"  added lines: 0",
 		"  verdict: green",
 		"  draft PR: https://github.com/foreverfl/feed/pull/1",
+		"  ready: feat/feed",
 	}, "\n") + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())

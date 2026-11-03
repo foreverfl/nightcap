@@ -99,6 +99,9 @@ func Run(args []string, stdout io.Writer) error {
 			if err := openDraftPR(ctx, stdout, statePath, dir, section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
 				return err
 			}
+			if err := markReadyWhenFinished(stdout, statePath, dir, section); err != nil {
+				return err
+			}
 			break
 		}
 	}
@@ -259,4 +262,25 @@ func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle s
 		input.Units = append(input.Units, bodyUnit)
 	}
 	return input
+}
+
+// markReadyWhenFinished turns section's draft PR ready for review once every unit of section has ended green or
+// read-code in the state file at statePath, and prints that it did. It returns an error when the state file or gh fails.
+func markReadyWhenFinished(stdout io.Writer, statePath, dir string, section plan.Section) error {
+	saved, err := state.Load(statePath)
+	if err != nil {
+		return err
+	}
+	for _, unit := range section.Units {
+		result := saved.Sections[section.Slug].Units[unit.Title].Result
+		if result != "green" && result != "read-code" {
+			return nil
+		}
+	}
+	branch := section.Type + "/" + section.Slug
+	if err := pr.MarkReady(dir, branch); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "  ready: %s\n", branch)
+	return nil
 }
