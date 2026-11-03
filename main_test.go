@@ -53,7 +53,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	want := "plan.md\n  branch: feat/feed\n  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed") + "\n  take  add it\n  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log") + ")\n  check: green\n  verdict: green\n"
+	want := "plan.md\n  branch: feat/feed\n  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed") + "\n  take  add it\n  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log") + ")\n  check: green\n  added lines: 0\n  verdict: green\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())
 	}

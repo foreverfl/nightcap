@@ -26,3 +26,19 @@ func ChangedFiles(dir string) ([]Change, error) {
 	}
 	return changes, nil
 }
+
+// AddedLines returns the text of every line dir's branch added since it left main, without the leading "+".
+// It returns an empty list when nothing was added, or an error when git fails.
+func AddedLines(dir string) ([]string, error) {
+	output, err := runGit(dir, "diff", "--unified=0", "main...HEAD")
+	if err != nil {
+		return nil, err
+	}
+	var lines []string
+	for line := range strings.SplitSeq(output, "\n") {
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			lines = append(lines, line[1:])
+		}
+	}
+	return lines, nil
+}

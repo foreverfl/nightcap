@@ -37,3 +37,18 @@ func TestChangedFilesListsOneAddedFile(t *testing.T) {
 		t.Fatalf("one committed new file should come back as [{A feed.go}], got %v", changes)
 	}
 }
+
+func TestAddedLinesReturnsTheOneAddedLine(t *testing.T) {
+	dir, err := AddWorktree(oneRepo(t), "feat/feed", "feed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitFile(t, dir, "feed.go", "package feed\n")
+	lines, err := AddedLines(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 1 || lines[0] != "package feed" {
+		t.Fatalf("a commit adding one line should come back as [package feed], got %q", lines)
+	}
+}

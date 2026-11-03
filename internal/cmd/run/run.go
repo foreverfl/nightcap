@@ -98,6 +98,11 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 			for _, change := range changes {
 				fmt.Fprintf(stdout, "  %s %s\n", change.Status, change.Path)
 			}
+			addedLines, err := git.AddedLines(dir)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
 			verdict := check.Classify(changes)
 			if verdict.Red {
 				fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
