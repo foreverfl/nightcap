@@ -9,25 +9,38 @@ import (
 	"testing"
 )
 
-// oneTarget makes a temp folder holding a git repo, a one-unit plan and a nightcap.yml
+// oneTarget makes a temp folder holding a git repo with a bare origin, a one-unit plan and a nightcap.yml
 // pointing at both, moves into it, and returns the repo path.
 func oneTarget(t *testing.T) string {
 	t.Helper()
 	t.Chdir(t.TempDir())
 	repo, _ := filepath.Abs("repo")
+	origin, _ := filepath.Abs("origin.git")
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main", repo},
 		{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"},
+		{"init", "-q", "--bare", origin},
+		{"-C", repo, "remote", "add", "origin", origin},
 	} {
 		if output, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
-	planText := []byte("## feat: feed (feed)\n\n- [ ] add it\n  - DONE  go test passes\n")
+	planText := []byte(strings.Join([]string{
+		"## feat: feed (feed)",
+		"",
+		"- [ ] add it",
+		"  - DONE  go test passes",
+	}, "\n") + "\n")
 	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	yml := []byte("targets:\n  - plan: plan.md\n    repo: " + repo + "\n    check: true\n")
+	yml := []byte(strings.Join([]string{
+		"targets:",
+		"  - plan: plan.md",
+		"    repo: " + repo,
+		"    check: true",
+	}, "\n") + "\n")
 	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -45,15 +58,40 @@ func useFakeClaude(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 }
 
+// useFakeGh points NIGHTCAP_GH at a script that prints one PR URL, the way `gh pr create` does.
+func useFakeGh(t *testing.T) {
+	t.Helper()
+	fakeGh := filepath.Join(t.TempDir(), "gh")
+	script := strings.Join([]string{
+		"#!/bin/sh",
+		"echo https://github.com/foreverfl/feed/pull/1",
+	}, "\n")
+	if err := os.WriteFile(fakeGh, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NIGHTCAP_GH", fakeGh)
+}
+
 func TestDispatchRunPrintsPickedSection(t *testing.T) {
 	repo := oneTarget(t)
 	useFakeClaude(t)
+	useFakeGh(t)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"run"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	want := "plan.md\n  branch: feat/feed\n  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed") + "\n  take  add it\n  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log") + ")\n  check: green\n  added lines: 0\n  verdict: green\n"
+	want := strings.Join([]string{
+		"plan.md",
+		"  branch: feat/feed",
+		"  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed"),
+		"  take  add it",
+		"  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log") + ")",
+		"  check: green",
+		"  added lines: 0",
+		"  verdict: green",
+		"  draft PR: https://github.com/foreverfl/feed/pull/1",
+	}, "\n") + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())
 	}

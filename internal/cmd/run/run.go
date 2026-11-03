@@ -14,6 +14,7 @@ import (
 	"nightcap/internal/config"
 	"nightcap/internal/git"
 	"nightcap/internal/plan"
+	"nightcap/internal/pr"
 	"nightcap/internal/state"
 )
 
@@ -76,6 +77,9 @@ func Run(args []string, stdout io.Writer) error {
 				continue
 			}
 			if err := runUnit(ctx, stdout, loaded, target, dir, section.Slug, index+1, unit, statePath); err != nil {
+				return err
+			}
+			if err := openDraftPR(stdout, statePath, dir, section, unit.Title); err != nil {
 				return err
 			}
 			break
@@ -172,4 +176,27 @@ func classifyBranch(stdout io.Writer, dir string, target config.Target, unit pla
 		fmt.Fprintln(stdout, "  verdict: green")
 	}
 	return verdict, nil
+}
+
+// openDraftPR pushes section's branch from dir and opens a draft PR once unitTitle has ended green or read-code
+// in the state file at statePath. It returns an error when git, gh or the state file fails.
+func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, unitTitle string) error {
+	saved, err := state.Load(statePath)
+	if err != nil {
+		return err
+	}
+	result := saved.Sections[section.Slug].Units[unitTitle].Result
+	isAccepted := result == "green" || result == "read-code"
+	if !isAccepted {
+		return nil
+	}
+	if err := git.Push(dir, section.Type+"/"+section.Slug); err != nil {
+		return err
+	}
+	prURL, err := pr.Create(dir, section.Type+": "+section.Title, section.Summary)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "  draft PR: %s\n", prURL)
+	return nil
 }
