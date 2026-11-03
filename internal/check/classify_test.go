@@ -33,3 +33,17 @@ func TestClassifyAddedSkipLineIsRed(t *testing.T) {
 		t.Fatalf("adding a t.Skip line should be red, got %+v", verdict)
 	}
 }
+
+func TestClassifyAddedExitLineIsNotRed(t *testing.T) {
+	verdict := Classify(nil, []string{"	os.Exit(1)"})
+	if verdict.Red {
+		t.Fatalf("os.Exit( ends in xit( but is not a skip, got %+v", verdict)
+	}
+}
+
+func TestClassifyAddedXitLineIsRed(t *testing.T) {
+	verdict := Classify(nil, []string{`  xit("loads the feed", () => {`})
+	if !verdict.Red {
+		t.Fatalf("a line starting with xit( should be red, got %+v", verdict)
+	}
+}

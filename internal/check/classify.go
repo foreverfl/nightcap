@@ -35,6 +35,15 @@ var skipMarkers = []string{
 	"skip: true",
 }
 
+// Bare function names like xit( also end other names (os.Exit(, benefit(), so they only count at the start of a line.
+var skipCallsAtLineStart = []string{
+	// JS / TS test skipping
+	"xit(", "xtest(", "xdescribe(",
+
+	// JS / TS test focusing
+	"fit(", "fdescribe(",
+}
+
 var dependencyFiles = []string{
 	"go.mod", "go.sum",
 	"Cargo.toml", "Cargo.lock",
@@ -54,10 +63,8 @@ func Classify(changes []git.Change, addedLines []string) Verdict {
 		}
 	}
 	for _, line := range addedLines {
-		for _, marker := range skipMarkers {
-			if strings.Contains(line, marker) {
-				return Verdict{Red: true, Reason: "added a skip marker: " + strings.TrimSpace(line)}
-			}
+		if hasSkipMarker(line) {
+			return Verdict{Red: true, Reason: "added a skip marker: " + strings.TrimSpace(line)}
 		}
 	}
 	return Verdict{}
@@ -75,6 +82,22 @@ func matchesAny(filePath string, patterns []string) bool {
 			continue
 		}
 		if matched, _ := path.Match(pattern, path.Base(filePath)); matched {
+			return true
+		}
+	}
+	return false
+}
+
+// hasSkipMarker reports whether line contains one of skipMarkers or starts with one of skipCallsAtLineStart.
+func hasSkipMarker(line string) bool {
+	for _, marker := range skipMarkers {
+		if strings.Contains(line, marker) {
+			return true
+		}
+	}
+	trimmed := strings.TrimSpace(line)
+	for _, call := range skipCallsAtLineStart {
+		if strings.HasPrefix(trimmed, call) {
 			return true
 		}
 	}
