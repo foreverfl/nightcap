@@ -7,10 +7,12 @@ import (
 	"nightcap/internal/git"
 )
 
-// Verdict is what the branch's changes say about a green unit; Red means the commit is not accepted.
+// Verdict is what the branch's changes say about a green unit; Red means the commit is not accepted,
+// ReadCode means it is accepted but the PR needs its code read.
 type Verdict struct {
-	Red    bool
-	Reason string
+	Red      bool
+	ReadCode bool
+	Reason   string
 }
 
 var contractFiles = []string{"*_test.go", "*.hurl", "openapi/*", "Makefile"}
@@ -50,10 +52,13 @@ var dependencyFiles = []string{
 	"package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
 }
 
+// A newly added file whose path contains this word is treated as a database migration.
+const migrationPathWord = "migration"
+
 // Classify returns a red Verdict when a change touches a dependency file, modifies or deletes an existing
-// contract file (adding a new one is allowed), or an added line carries a skip marker.
-// It returns an empty Verdict when no rule matches.
-func Classify(changes []git.Change, addedLines []string) Verdict {
+// contract file (adding a new one is allowed), or an added line carries a skip marker; past those, a ReadCode
+// one when a change matches readCode, adds a migration or sits outside wherePaths. Otherwise an empty Verdict.
+func Classify(changes []git.Change, addedLines, wherePaths, readCode []string) Verdict {
 	for _, change := range changes {
 		if matchesAny(change.Path, dependencyFiles) {
 			return Verdict{Red: true, Reason: "changed a dependency file: " + change.Path}
@@ -67,7 +72,31 @@ func Classify(changes []git.Change, addedLines []string) Verdict {
 			return Verdict{Red: true, Reason: "added a skip marker: " + strings.TrimSpace(line)}
 		}
 	}
+	for _, change := range changes {
+		if matchesAny(change.Path, readCode) {
+			return Verdict{ReadCode: true, Reason: "matches read_code: " + change.Path}
+		}
+		if change.Status == "A" && strings.Contains(change.Path, migrationPathWord) {
+			return Verdict{ReadCode: true, Reason: "added a migration: " + change.Path}
+		}
+		if !isInsideWhere(change.Path, wherePaths) {
+			return Verdict{ReadCode: true, Reason: "outside WHERE: " + change.Path}
+		}
+	}
 	return Verdict{}
+}
+
+// isInsideWhere reports whether filePath is one of wherePaths, sits under one of them as a folder,
+// or has the same file name as an entry that names no folder.
+func isInsideWhere(filePath string, wherePaths []string) bool {
+	for _, where := range wherePaths {
+		folder := strings.TrimSuffix(where, "/")
+		hasNoFolder := !strings.Contains(where, "/")
+		if filePath == where || strings.HasPrefix(filePath, folder+"/") || (hasNoFolder && path.Base(filePath) == where) {
+			return true
+		}
+	}
+	return false
 }
 
 // matchesAny reports whether filePath matches one of patterns.
