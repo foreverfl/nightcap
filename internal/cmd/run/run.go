@@ -265,22 +265,29 @@ func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle s
 }
 
 // markReadyWhenFinished turns section's draft PR ready for review once every unit of section has ended green or
-// read-code in the state file at statePath, and prints that it did. It returns an error when the state file or gh fails.
+// read-code in the state file at statePath, then labels it read-pr or read-code. It returns an error when the state file or gh fails.
 func markReadyWhenFinished(stdout io.Writer, statePath, dir string, section plan.Section) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
 	}
+	var unitResults []string
 	for _, unit := range section.Units {
 		result := saved.Sections[section.Slug].Units[unit.Title].Result
 		if result != "green" && result != "read-code" {
 			return nil
 		}
+		unitResults = append(unitResults, result)
 	}
 	branch := section.Type + "/" + section.Slug
 	if err := pr.MarkReady(dir, branch); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "  ready: %s\n", branch)
+	label := pr.ReadingLabel(unitResults)
+	if err := pr.AddLabel(dir, branch, label); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "  label: %s\n", label)
 	return nil
 }
