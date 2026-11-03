@@ -193,7 +193,7 @@ func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, 
 	if err := git.Push(dir, section.Type+"/"+section.Slug); err != nil {
 		return err
 	}
-	prURL, err := pr.Create(dir, section.Type+": "+section.Title, section.Summary)
+	prURL, err := pr.CreateDraft(dir, section.Type+": "+section.Title, section.Summary)
 	if err != nil {
 		return err
 	}
