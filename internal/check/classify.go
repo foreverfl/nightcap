@@ -15,22 +15,49 @@ type Verdict struct {
 
 var contractFiles = []string{"*_test.go", "*.hurl", "openapi/*", "Makefile"}
 
+var skipMarkers = []string{
+	// Go testing
+	"t.Skip",
+
+	// Rust testing
+	"#[ignore]",
+
+	// JS / TS test skipping
+	".skip(", ".skipIf(", ".only(",
+
+	// Lint suppression
+	"nolint", "eslint-disable",
+
+	// Coverage exclusion
+	"istanbul ignore", "c8 ignore", "pragma: no cover",
+
+	// Generic options
+	"skip: true",
+}
+
 var dependencyFiles = []string{
 	"go.mod", "go.sum",
 	"Cargo.toml", "Cargo.lock",
 	"package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
 }
 
-// Classify returns a red Verdict when a change touches a dependency file in any way,
-// or modifies or deletes an existing contract file; adding a new contract file is allowed.
+// Classify returns a red Verdict when a change touches a dependency file, modifies or deletes an existing
+// contract file (adding a new one is allowed), or an added line carries a skip marker.
 // It returns an empty Verdict when no rule matches.
-func Classify(changes []git.Change) Verdict {
+func Classify(changes []git.Change, addedLines []string) Verdict {
 	for _, change := range changes {
 		if matchesAny(change.Path, dependencyFiles) {
 			return Verdict{Red: true, Reason: "changed a dependency file: " + change.Path}
 		}
 		if change.Status != "A" && matchesAny(change.Path, contractFiles) {
 			return Verdict{Red: true, Reason: "edited a contract file: " + change.Path}
+		}
+	}
+	for _, line := range addedLines {
+		for _, marker := range skipMarkers {
+			if strings.Contains(line, marker) {
+				return Verdict{Red: true, Reason: "added a skip marker: " + strings.TrimSpace(line)}
+			}
 		}
 	}
 	return Verdict{}

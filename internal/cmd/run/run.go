@@ -103,7 +103,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 				return err
 			}
 			fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
-			verdict := check.Classify(changes)
+			verdict := check.Classify(changes, addedLines)
 			if verdict.Red {
 				fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
 			} else {
