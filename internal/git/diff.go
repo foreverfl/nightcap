@@ -27,17 +27,28 @@ func ChangedFiles(dir string) ([]Change, error) {
 	return changes, nil
 }
 
-// AddedLines returns the text of every line dir's branch added since it left main, without the leading "+".
+// AddedLine is one line a branch added: the file it is in and its text without the leading "+".
+type AddedLine struct {
+	Path string
+	Text string
+}
+
+// AddedLines returns every line dir's branch added since it left main, each with the file it is in.
 // It returns an empty list when nothing was added, or an error when git fails.
-func AddedLines(dir string) ([]string, error) {
+func AddedLines(dir string) ([]AddedLine, error) {
 	output, err := runGit(dir, "diff", "--unified=0", "main...HEAD")
 	if err != nil {
 		return nil, err
 	}
-	var lines []string
+	var lines []AddedLine
+	path := ""
 	for line := range strings.SplitSeq(output, "\n") {
+		if filePath, isFileHeader := strings.CutPrefix(line, "+++ b/"); isFileHeader {
+			path = filePath
+			continue
+		}
 		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
-			lines = append(lines, line[1:])
+			lines = append(lines, AddedLine{Path: path, Text: line[1:]})
 		}
 	}
 	return lines, nil

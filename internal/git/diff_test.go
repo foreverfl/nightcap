@@ -48,7 +48,7 @@ func TestAddedLinesReturnsTheOneAddedLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 1 || lines[0] != "package feed" {
-		t.Fatalf("a commit adding one line should come back as [package feed], got %q", lines)
+	if len(lines) != 1 || lines[0] != (AddedLine{Path: "feed.go", Text: "package feed"}) {
+		t.Fatalf("a commit adding one line to feed.go should come back as [{feed.go package feed}], got %+v", lines)
 	}
 }

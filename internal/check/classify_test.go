@@ -28,21 +28,21 @@ func TestClassifyEditedGoSumIsRed(t *testing.T) {
 }
 
 func TestClassifyAddedSkipLineIsRed(t *testing.T) {
-	verdict := Classify(nil, []string{`	t.Skip("later")`}, nil, nil)
-	if verdict != (Verdict{Red: true, Reason: `added a skip marker: t.Skip("later")`}) {
+	verdict := Classify(nil, []git.AddedLine{{Path: "feed_test.go", Text: `	t.Skip("later")`}}, nil, nil)
+	if verdict != (Verdict{Red: true, Reason: `added a skip marker in feed_test.go: t.Skip("later")`}) {
 		t.Fatalf("adding a t.Skip line should be red, got %+v", verdict)
 	}
 }
 
 func TestClassifyAddedExitLineIsNotRed(t *testing.T) {
-	verdict := Classify(nil, []string{"	os.Exit(1)"}, nil, nil)
+	verdict := Classify(nil, []git.AddedLine{{Path: "feed_test.go", Text: "	os.Exit(1)"}}, nil, nil)
 	if verdict.Red {
 		t.Fatalf("os.Exit( ends in xit( but is not a skip, got %+v", verdict)
 	}
 }
 
 func TestClassifyAddedXitLineIsRed(t *testing.T) {
-	verdict := Classify(nil, []string{`  xit("loads the feed", () => {`}, nil, nil)
+	verdict := Classify(nil, []git.AddedLine{{Path: "feed_test.go", Text: `  xit("loads the feed", () => {`}}, nil, nil)
 	if !verdict.Red {
 		t.Fatalf("a line starting with xit( should be red, got %+v", verdict)
 	}
