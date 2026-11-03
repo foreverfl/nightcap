@@ -1,9 +1,7 @@
 package git
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -40,15 +38,4 @@ func ListWorktrees(repo string) ([]string, error) {
 func branchExists(repo, branch string) bool {
 	_, err := runGit(repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
 	return err == nil
-}
-
-// runGit runs git -C repo with args and returns its stdout,
-// or an error that carries git's combined output when it exits non-zero.
-func runGit(repo string, args ...string) (string, error) {
-	command := exec.Command("git", append([]string{"-C", repo}, args...)...)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, output)
-	}
-	return string(output), nil
 }

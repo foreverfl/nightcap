@@ -70,9 +70,9 @@ func Run(args []string, stdout io.Writer) error {
 	return nil
 }
 
-// runUnit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail into the next prompt.
-// It prints "blocked" when the rounds run out, the same tail comes back twice in a row, or claude stops before Done.
-// It returns an error only when claude or sh cannot run.
+// runUnit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail or a red verdict's
+// reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
+// or claude stops before Done. It returns an error only when claude, sh or git cannot run.
 func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, slug string, number int, unit plan.Unit) error {
 	failureTail := ""
 	for round := 1; round <= loaded.MaxRounds; round++ {
@@ -85,19 +85,29 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		if result.Outcome != claude.Done {
 			break
 		}
+		// 1. Check: run the check command from nightcap.yml (tests pass or not)
 		checked, err := check.Run(ctx, dir, target.Check)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
+		failure := checked.Tail
+		// 2. Classify: sort what the branch changed by the rules in check/classify.go
 		if checked.Green {
-			return nil
+			verdict, err := classifyBranch(stdout, dir, target, unit)
+			if err != nil {
+				return err
+			}
+			if !verdict.Red {
+				return nil
+			}
+			failure = verdict.Reason
 		}
-		sameFailureAsLastRound := round > 1 && checked.Tail == failureTail
+		sameFailureAsLastRound := round > 1 && failure == failureTail
 		if sameFailureAsLastRound {
 			break
 		}
-		failureTail = checked.Tail
+		failureTail = failure
 	}
 	fmt.Fprintln(stdout, "  blocked")
 	return nil
@@ -109,4 +119,30 @@ func color(green bool) string {
 		return "green"
 	}
 	return "red"
+}
+
+// classifyBranch prints the files and the count of lines dir's branch changed, then the verdict on them.
+// It returns that verdict, or an error when git fails.
+func classifyBranch(stdout io.Writer, dir string, target config.Target, unit plan.Unit) (check.Verdict, error) {
+	changes, err := git.ChangedFiles(dir)
+	if err != nil {
+		return check.Verdict{}, err
+	}
+	for _, change := range changes {
+		fmt.Fprintf(stdout, "  %s %s\n", change.Status, change.Path)
+	}
+	addedLines, err := git.AddedLines(dir)
+	if err != nil {
+		return check.Verdict{}, err
+	}
+	fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
+	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), target.ReadCode)
+	if verdict.Red {
+		fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
+	} else if verdict.ReadCode {
+		fmt.Fprintf(stdout, "  verdict: green, read the code (%s)\n", verdict.Reason)
+	} else {
+		fmt.Fprintln(stdout, "  verdict: green")
+	}
+	return verdict, nil
 }
