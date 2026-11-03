@@ -195,7 +195,7 @@ func classifyBranch(stdout io.Writer, dir string, target config.Target, unit pla
 }
 
 // openDraftPR pushes section's branch from dir and opens a draft PR once unitTitle has ended green or read-code
-// in the state file at statePath; with hasPR it only pushes. It returns an error when git, gh or the state file fails.
+// in the state file at statePath, with a description of every finished unit; with hasPR it replaces that PR's description instead. It returns an error when git, gh or the state file fails.
 func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, unitTitle string, hasPR bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
@@ -206,16 +206,39 @@ func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, 
 	if !isAccepted {
 		return nil
 	}
-	if err := git.Push(dir, section.Type+"/"+section.Slug); err != nil {
+	branch := section.Type + "/" + section.Slug
+	if err := git.Push(dir, branch); err != nil {
+		return err
+	}
+	body, err := pr.BuildBody(bodyInput(section, saved.Sections[section.Slug], unitTitle))
+	if err != nil {
 		return err
 	}
 	if hasPR {
-		return nil
+		return pr.EditBody(dir, branch, body)
 	}
-	prURL, err := pr.CreateDraft(dir, section.Type+": "+section.Title, section.Summary)
+	prURL, err := pr.CreateDraft(dir, section.Type+": "+section.Title, body)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "  draft PR: %s\n", prURL)
 	return state.SavePRStatus(statePath, section.Slug, prURL, "OPEN")
+}
+
+// bodyInput collects the PR description's values: section's summary, every unit of section that ended green or read-code
+// in sectionState, in plan order, and the last check tail of lastUnitTitle.
+func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle string) pr.BodyInput {
+	input := pr.BodyInput{Summary: section.Summary, CheckTail: sectionState.Units[lastUnitTitle].CheckTail}
+	for _, unit := range section.Units {
+		record := sectionState.Units[unit.Title]
+		if record.Result != "green" && record.Result != "read-code" {
+			continue
+		}
+		bodyUnit := pr.BodyUnit{What: plan.LabelValue(unit.Body, "WHAT"), Done: plan.LabelValue(unit.Body, "DONE")}
+		if record.Result == "read-code" {
+			bodyUnit.ReadCodeReason = record.Reason
+		}
+		input.Units = append(input.Units, bodyUnit)
+	}
+	return input
 }
