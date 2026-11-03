@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // Load reads the state file at path, or returns an empty State when the file does not exist yet.
@@ -48,4 +49,31 @@ func Save(path string, current State) error {
 		return err
 	}
 	return os.Rename(tempFile.Name(), path)
+}
+
+// SaveUnit records how one unit of the heading sectionSlug ended, stamped with the current time,
+// keeping everything else already in the state file at path. It returns an error when reading or writing fails.
+func SaveUnit(path, sectionSlug, unitTitle string, unit Unit) error {
+	current, err := Load(path)
+	if err != nil {
+		return err
+	}
+	section := current.Sections[sectionSlug]
+	if section.Units == nil {
+		section.Units = map[string]Unit{}
+	}
+	unit.UpdatedAt = time.Now().UTC()
+	section.Units[unitTitle] = unit
+	current.Sections[sectionSlug] = section
+	return Save(path, current)
+}
+
+// IsBlocked reports whether any unit of section ended blocked.
+func IsBlocked(section Section) bool {
+	for _, unit := range section.Units {
+		if unit.Result == "blocked" {
+			return true
+		}
+	}
+	return false
 }

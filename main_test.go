@@ -155,3 +155,32 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 		t.Fatalf("stdout should end with a red verdict and blocked, got %q", stdout.String())
 	}
 }
+
+func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
+	repo := oneTarget(t)
+	useFakeClaude(t)
+	yml := []byte(strings.Join([]string{
+		"max_rounds: 2",
+		"targets:",
+		"  - plan: plan.md",
+		"    repo: " + repo,
+		"    check: false",
+	}, "\n"))
+	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var firstStdout, secondStdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run"}, &firstStdout, &stderr); code != 0 {
+		t.Fatalf("first run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	if code := dispatch([]string{"run"}, &secondStdout, &stderr); code != 0 {
+		t.Fatalf("second run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	want := strings.Join([]string{
+		"skip feed: blocked",
+		"plan.md: nothing to take",
+	}, "\n") + "\n"
+	if secondStdout.String() != want {
+		t.Fatalf("second run stdout = %q, want %q", secondStdout.String(), want)
+	}
+}
