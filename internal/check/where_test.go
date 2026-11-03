@@ -27,3 +27,14 @@ func TestWherePathsWithoutWhereLineIsNil(t *testing.T) {
 		t.Fatalf("a body with no WHERE line should give nil, got %q", paths)
 	}
 }
+
+func TestWherePathsExpandsBraces(t *testing.T) {
+	body := strings.Join([]string{
+		"- [ ] add the feed",
+		"  - WHERE internal/check/{run.go, classify.go}, main.go",
+	}, "\n")
+	want := []string{"internal/check/run.go", "internal/check/classify.go", "main.go"}
+	if paths := WherePaths(body); !slices.Equal(paths, want) {
+		t.Fatalf("want %q, got %q", want, paths)
+	}
+}
