@@ -118,3 +118,40 @@ func TestDispatchUnknownCommandPrintsUsageAndExits2(t *testing.T) {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
+
+func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
+	repo := oneTarget(t)
+	fakeClaude := filepath.Join(t.TempDir(), "claude")
+	script := strings.Join([]string{
+		"#!/bin/sh",
+		"echo $$ >> go.sum",
+		"git add go.sum",
+		"git -c user.name=t -c user.email=t@t commit -q -m 'touch go.sum'",
+		`echo '{"type":"result","result":"ok"}'`,
+	}, "\n")
+	if err := os.WriteFile(fakeClaude, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
+	yml := []byte(strings.Join([]string{
+		"max_rounds: 3",
+		"targets:",
+		"  - plan: plan.md",
+		"    repo: " + repo,
+		"    check: true",
+	}, "\n"))
+	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
+	if len(logs) != 2 {
+		t.Fatalf("go.sum turns the verdict red the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
+	}
+	if !strings.HasSuffix(stdout.String(), "  verdict: red (changed a dependency file: go.sum)\n  blocked\n") {
+		t.Fatalf("stdout should end with a red verdict and blocked, got %q", stdout.String())
+	}
+}
