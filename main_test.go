@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,7 +46,7 @@ func oneTarget(t *testing.T) string {
 	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	useFakeGh(t)
+	useFakeGh(t, nil)
 	return repo
 }
 
@@ -60,23 +61,27 @@ func useFakeClaude(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 }
 
-// useFakeGh points NIGHTCAP_GH at a script that runs viewLines for `gh pr view`, or answers "no PR" when there are none,
-// and prints one PR URL for anything else, the way `gh pr create` does.
-func useFakeGh(t *testing.T, viewLines ...string) {
+// fakeGhPath is resolved before any test moves into its temp folder.
+var fakeGhPath, _ = filepath.Abs("testdata/fake-gh.sh")
+
+// useFakeGh points NIGHTCAP_GH at testdata/fake-gh.sh, which answers `gh pr view <branch>` with that branch's state
+// from prStates (OPEN, MERGED or CLOSED), or "no PR" for a branch not in it, and prints one PR URL for anything else.
+// It returns the path of the file where the fake writes every call's arguments, one call per line.
+func useFakeGh(t *testing.T, prStates map[string]string) string {
 	t.Helper()
-	if len(viewLines) == 0 {
-		viewLines = []string{`echo 'no pull requests found for branch "feat/feed"' >&2`, "exit 1"}
+	var stateLines []string
+	for _, branch := range slices.Sorted(maps.Keys(prStates)) {
+		stateLines = append(stateLines, branch+" "+prStates[branch]+"\n")
 	}
-	fakeGh := filepath.Join(t.TempDir(), "gh")
-	script := strings.Join(slices.Concat(
-		[]string{"#!/bin/sh", `if [ "$2" = "view" ]; then`},
-		viewLines,
-		[]string{"fi", "echo https://github.com/foreverfl/feed/pull/1"},
-	), "\n")
-	if err := os.WriteFile(fakeGh, []byte(script), 0o755); err != nil {
+	statesPath := filepath.Join(t.TempDir(), "gh-states")
+	if err := os.WriteFile(statesPath, []byte(strings.Join(stateLines, "")), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("NIGHTCAP_GH", fakeGh)
+	callsPath := filepath.Join(t.TempDir(), "gh-calls")
+	t.Setenv("NIGHTCAP_GH", fakeGhPath)
+	t.Setenv("FAKE_GH_STATES", statesPath)
+	t.Setenv("FAKE_GH_CALLS", callsPath)
+	return callsPath
 }
 
 func TestDispatchRunPrintsPickedSection(t *testing.T) {
@@ -233,7 +238,7 @@ func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
 
 func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
 	oneTarget(t)
-	useFakeGh(t, `echo '{"state":"MERGED","url":"https://github.com/foreverfl/feed/pull/1"}'`, "exit 0")
+	useFakeGh(t, map[string]string{"feat/feed": "MERGED"})
 	var stdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
@@ -267,19 +272,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	if output, err := exec.Command("git", "-C", repo, "branch", "feat/feed").CombinedOutput(); err != nil {
 		t.Fatalf("git branch: %v\n%s", err, output)
 	}
-	ghCallsPath := filepath.Join(t.TempDir(), "gh-calls")
-	fakeGh := filepath.Join(t.TempDir(), "gh")
-	script := strings.Join([]string{
-		"#!/bin/sh",
-		`echo "$@" >> ` + ghCallsPath,
-		`if [ "$2" = "view" ] && [ "$3" = "feat/feed" ]; then echo '{"state":"OPEN","url":"https://github.com/foreverfl/feed/pull/1"}'; exit 0; fi`,
-		`if [ "$2" = "view" ]; then echo 'no pull requests found' >&2; exit 1; fi`,
-		"echo https://github.com/foreverfl/feed/pull/2",
-	}, "\n")
-	if err := os.WriteFile(fakeGh, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("NIGHTCAP_GH", fakeGh)
+	ghCallsPath := useFakeGh(t, map[string]string{"feat/feed": "OPEN"})
 	var stdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run", "--section", "feed-page"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
