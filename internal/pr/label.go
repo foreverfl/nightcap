@@ -17,10 +17,10 @@ func ReadingLabel(unitResults []string) string {
 
 // AddLabel creates label in the repo when it is missing and puts it on the PR whose head is branch.
 // It returns an error when gh fails.
-func AddLabel(dir, branch, label string) error {
-	if _, err := runGh(dir, "label", "create", label, "--force"); err != nil {
+func AddLabel(worktreeDir, branch, label string) error {
+	if _, err := runGh(worktreeDir, "label", "create", label, "--force"); err != nil {
 		return err
 	}
-	_, err := runGh(dir, "pr", "edit", branch, "--add-label", label)
+	_, err := runGh(worktreeDir, "pr", "edit", branch, "--add-label", label)
 	return err
 }

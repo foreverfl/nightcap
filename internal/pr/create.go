@@ -5,8 +5,8 @@ func draftArgs(base, title, bodyPath string) []string {
 	return []string{"pr", "create", "--draft", "--base", base, "--title", title, "--body-file", bodyPath}
 }
 
-// CreateDraft opens a draft PR from dir's branch into base and returns its URL, which gh prints alone on stdout.
+// CreateDraft opens a draft PR from worktreeDir's branch into base and returns its URL, which gh prints alone on stdout.
 // It returns an error when gh fails.
-func CreateDraft(dir, base, title, body string) (string, error) {
-	return runGhWithBody(dir, body, func(bodyPath string) []string { return draftArgs(base, title, bodyPath) })
+func CreateDraft(worktreeDir, base, title, body string) (string, error) {
+	return runGhWithBody(worktreeDir, body, func(bodyPath string) []string { return draftArgs(base, title, bodyPath) })
 }

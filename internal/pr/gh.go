@@ -17,9 +17,9 @@ func ghBinary() string {
 	return "gh"
 }
 
-// runGhWithBody writes body to a temp file, runs gh in dir with argsFor(that file's path),
+// runGhWithBody writes body to a temp file, runs gh in worktreeDir with argsFor(that file's path),
 // and returns what gh printed on stdout. It returns an error with gh's stderr attached when gh fails.
-func runGhWithBody(dir, body string, argsFor func(bodyPath string) []string) (string, error) {
+func runGhWithBody(worktreeDir, body string, argsFor func(bodyPath string) []string) (string, error) {
 	bodyFile, err := os.CreateTemp("", "nightcap-pr-*.md")
 	if err != nil {
 		return "", err
@@ -29,14 +29,14 @@ func runGhWithBody(dir, body string, argsFor func(bodyPath string) []string) (st
 	if closeErr := bodyFile.Close(); writeErr != nil || closeErr != nil {
 		return "", errors.Join(writeErr, closeErr)
 	}
-	return runGh(dir, argsFor(bodyFile.Name())...)
+	return runGh(worktreeDir, argsFor(bodyFile.Name())...)
 }
 
-// runGh runs gh in dir with args and returns what it printed on stdout, trimmed.
+// runGh runs gh in worktreeDir with args and returns what it printed on stdout, trimmed.
 // It returns an error with gh's stderr attached when gh fails.
-func runGh(dir string, args ...string) (string, error) {
+func runGh(worktreeDir string, args ...string) (string, error) {
 	command := exec.Command(ghBinary(), args...)
-	command.Dir = dir
+	command.Dir = worktreeDir
 	output, err := command.Output()
 	if exitErr, isExitErr := errors.AsType[*exec.ExitError](err); isExitErr {
 		return "", fmt.Errorf("gh %s: %w\n%s", strings.Join(args[:2], " "), err, exitErr.Stderr)

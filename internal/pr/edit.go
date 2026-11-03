@@ -6,7 +6,7 @@ func editArgs(branch, bodyPath string) []string {
 }
 
 // EditBody replaces the description of the PR whose head is branch with body. It returns an error when gh fails.
-func EditBody(dir, branch, body string) error {
-	_, err := runGhWithBody(dir, body, func(bodyPath string) []string { return editArgs(branch, bodyPath) })
+func EditBody(worktreeDir, branch, body string) error {
+	_, err := runGhWithBody(worktreeDir, body, func(bodyPath string) []string { return editArgs(branch, bodyPath) })
 	return err
 }

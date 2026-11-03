@@ -14,11 +14,11 @@ type View struct {
 	URL   string `json:"url"`
 }
 
-// ViewBranch asks gh, from dir, for the PR whose head is branch. It returns an empty View when the branch has no PR,
+// ViewBranch asks gh, from repoDir, for the PR whose head is branch. It returns an empty View when the branch has no PR,
 // or an error when gh fails for any other reason or prints something that is not the JSON it was asked for.
-func ViewBranch(dir, branch string) (View, error) {
+func ViewBranch(repoDir, branch string) (View, error) {
 	command := exec.Command(ghBinary(), "pr", "view", branch, "--json", "state,url")
-	command.Dir = dir
+	command.Dir = repoDir
 	output, err := command.Output()
 	if exitErr, isExitErr := errors.AsType[*exec.ExitError](err); isExitErr {
 		if strings.Contains(string(exitErr.Stderr), "no pull requests found") {
