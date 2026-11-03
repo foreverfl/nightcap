@@ -23,7 +23,7 @@ func oneRepo(t *testing.T) string {
 
 func TestAddWorktreeCreatesBranchFolder(t *testing.T) {
 	repo := oneRepo(t)
-	dir, err := AddWorktree(repo, "feat/feed", "feed")
+	dir, err := AddWorktree(repo, "main", "feat/feed", "feed")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,17 +37,17 @@ func TestAddWorktreeCreatesBranchFolder(t *testing.T) {
 
 func TestAddWorktreeReusesExistingFolder(t *testing.T) {
 	repo := oneRepo(t)
-	if _, err := AddWorktree(repo, "feat/feed", "feed"); err != nil {
+	if _, err := AddWorktree(repo, "main", "feat/feed", "feed"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := AddWorktree(repo, "feat/feed", "feed"); err != nil {
+	if _, err := AddWorktree(repo, "main", "feat/feed", "feed"); err != nil {
 		t.Fatalf("second add: %v", err)
 	}
 }
 
 func TestListWorktreesShowsAddedOne(t *testing.T) {
 	repo := oneRepo(t)
-	if _, err := AddWorktree(repo, "feat/feed", "feed"); err != nil {
+	if _, err := AddWorktree(repo, "main", "feat/feed", "feed"); err != nil {
 		t.Fatal(err)
 	}
 	lines, err := ListWorktrees(repo)

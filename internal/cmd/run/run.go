@@ -75,8 +75,9 @@ func Run(args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, "%s: nothing to take\n", target.Plan)
 			continue
 		}
+		base := "main"
 		branch := section.Type + "/" + section.Slug
-		dir, err := git.AddWorktree(target.Repo, branch, section.Slug)
+		dir, err := git.AddWorktree(target.Repo, base, branch, section.Slug)
 		if err != nil {
 			return err
 		}
@@ -93,10 +94,10 @@ func Run(args []string, stdout io.Writer) error {
 			if !unit.HasCheck {
 				continue
 			}
-			if err := runUnit(ctx, stdout, loaded, target, dir, section.Slug, index+1, unit, statePath); err != nil {
+			if err := runUnit(ctx, stdout, loaded, target, dir, base, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
-			if err := openDraftPR(ctx, stdout, statePath, dir, section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
+			if err := openDraftPR(ctx, stdout, statePath, dir, base, section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
 				return err
 			}
 			if err := markReadyWhenFinished(stdout, statePath, dir, section); err != nil {
@@ -112,7 +113,7 @@ func Run(args []string, stdout io.Writer) error {
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
 // or claude stops before Done. Every round's outcome goes into the state file at statePath.
 // It returns an error only when claude, sh, git or the state file fails.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, slug string, number int, unit plan.Unit, statePath string) error {
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, base, slug string, number int, unit plan.Unit, statePath string) error {
 	failureTail := ""
 	record := state.Unit{}
 	for round := 1; round <= loaded.MaxRounds; round++ {
@@ -136,7 +137,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
 		if checked.Green {
-			verdict, err := classifyBranch(stdout, dir, target, unit)
+			verdict, err := classifyBranch(stdout, dir, base, target, unit)
 			if err != nil {
 				return err
 			}
@@ -174,15 +175,15 @@ func color(green bool) string {
 
 // classifyBranch prints the files and the count of lines dir's branch changed, then the verdict on them.
 // It returns that verdict, or an error when git fails.
-func classifyBranch(stdout io.Writer, dir string, target config.Target, unit plan.Unit) (check.Verdict, error) {
-	changes, err := git.ChangedFiles(dir)
+func classifyBranch(stdout io.Writer, dir, base string, target config.Target, unit plan.Unit) (check.Verdict, error) {
+	changes, err := git.ChangedFiles(dir, base)
 	if err != nil {
 		return check.Verdict{}, err
 	}
 	for _, change := range changes {
 		fmt.Fprintf(stdout, "  %s %s\n", change.Status, change.Path)
 	}
-	addedLines, err := git.AddedLines(dir)
+	addedLines, err := git.AddedLines(dir, base)
 	if err != nil {
 		return check.Verdict{}, err
 	}
@@ -201,7 +202,7 @@ func classifyBranch(stdout io.Writer, dir string, target config.Target, unit pla
 // openDraftPR pushes section's branch from dir once unitTitle has ended green or read-code in the state file at statePath,
 // then opens a draft PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
 // isEnglishWanted). It returns an error when git, gh or the state file fails.
-func openDraftPR(ctx context.Context, stdout io.Writer, statePath, dir string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
+func openDraftPR(ctx context.Context, stdout io.Writer, statePath, dir, base string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -215,11 +216,11 @@ func openDraftPR(ctx context.Context, stdout io.Writer, statePath, dir string, s
 	if err := git.Push(dir, branch); err != nil {
 		return err
 	}
-	changes, err := git.ChangedFiles(dir)
+	changes, err := git.ChangedFiles(dir, base)
 	if err != nil {
 		return err
 	}
-	addedLines, err := git.AddedLines(dir)
+	addedLines, err := git.AddedLines(dir, base)
 	if err != nil {
 		return err
 	}
@@ -238,7 +239,7 @@ func openDraftPR(ctx context.Context, stdout io.Writer, statePath, dir string, s
 	if hasPR {
 		return pr.EditBody(dir, branch, body)
 	}
-	prURL, err := pr.CreateDraft(dir, section.Type+": "+section.Title, body)
+	prURL, err := pr.CreateDraft(dir, base, section.Type+": "+section.Title, body)
 	if err != nil {
 		return err
 	}

@@ -8,11 +8,10 @@ type Change struct {
 	Path   string
 }
 
-// ChangedFiles lists the files dir's branch changed since it left main, a rename coming back as a D and an A.
+// ChangedFiles lists the files dir's branch changed since it left base, a rename coming back as a D and an A.
 // It returns an empty list when nothing changed, or an error when git fails.
-func ChangedFiles(dir string) ([]Change, error) {
-	// TODO: repos that branch from staging (blog-v2) need the branch the worktree left from, not main.
-	output, err := runGit(dir, "diff", "--name-status", "--no-renames", "main...HEAD")
+func ChangedFiles(dir, base string) ([]Change, error) {
+	output, err := runGit(dir, "diff", "--name-status", "--no-renames", base+"...HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -33,10 +32,10 @@ type AddedLine struct {
 	Text string
 }
 
-// AddedLines returns every line dir's branch added since it left main, each with the file it is in.
+// AddedLines returns every line dir's branch added since it left base, each with the file it is in.
 // It returns an empty list when nothing was added, or an error when git fails.
-func AddedLines(dir string) ([]AddedLine, error) {
-	output, err := runGit(dir, "diff", "--unified=0", "main...HEAD")
+func AddedLines(dir, base string) ([]AddedLine, error) {
+	output, err := runGit(dir, "diff", "--unified=0", base+"...HEAD")
 	if err != nil {
 		return nil, err
 	}

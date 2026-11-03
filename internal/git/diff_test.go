@@ -24,12 +24,12 @@ func commitFile(t *testing.T, dir, name, content string) {
 }
 
 func TestChangedFilesListsOneAddedFile(t *testing.T) {
-	dir, err := AddWorktree(oneRepo(t), "feat/feed", "feed")
+	dir, err := AddWorktree(oneRepo(t), "main", "feat/feed", "feed")
 	if err != nil {
 		t.Fatal(err)
 	}
 	commitFile(t, dir, "feed.go", "package feed\n")
-	changes, err := ChangedFiles(dir)
+	changes, err := ChangedFiles(dir, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,12 +39,12 @@ func TestChangedFilesListsOneAddedFile(t *testing.T) {
 }
 
 func TestAddedLinesReturnsTheOneAddedLine(t *testing.T) {
-	dir, err := AddWorktree(oneRepo(t), "feat/feed", "feed")
+	dir, err := AddWorktree(oneRepo(t), "main", "feat/feed", "feed")
 	if err != nil {
 		t.Fatal(err)
 	}
 	commitFile(t, dir, "feed.go", "package feed\n")
-	lines, err := AddedLines(dir)
+	lines, err := AddedLines(dir, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
