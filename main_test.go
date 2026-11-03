@@ -5,12 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
 
 // oneTarget makes a temp folder holding a git repo with a bare origin, a one-unit plan and a nightcap.yml
-// pointing at both, moves into it, and returns the repo path.
+// pointing at both, swaps in a fake gh with no PR, moves into it, and returns the repo path.
 func oneTarget(t *testing.T) string {
 	t.Helper()
 	t.Chdir(t.TempDir())
@@ -44,6 +45,7 @@ func oneTarget(t *testing.T) string {
 	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	useFakeGh(t)
 	return repo
 }
 
@@ -58,14 +60,19 @@ func useFakeClaude(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 }
 
-// useFakeGh points NIGHTCAP_GH at a script that prints one PR URL, the way `gh pr create` does.
-func useFakeGh(t *testing.T) {
+// useFakeGh points NIGHTCAP_GH at a script that runs viewLines for `gh pr view`, or answers "no PR" when there are none,
+// and prints one PR URL for anything else, the way `gh pr create` does.
+func useFakeGh(t *testing.T, viewLines ...string) {
 	t.Helper()
+	if len(viewLines) == 0 {
+		viewLines = []string{`echo 'no pull requests found for branch "feat/feed"' >&2`, "exit 1"}
+	}
 	fakeGh := filepath.Join(t.TempDir(), "gh")
-	script := strings.Join([]string{
-		"#!/bin/sh",
-		"echo https://github.com/foreverfl/feed/pull/1",
-	}, "\n")
+	script := strings.Join(slices.Concat(
+		[]string{"#!/bin/sh", `if [ "$2" = "view" ]; then`},
+		viewLines,
+		[]string{"fi", "echo https://github.com/foreverfl/feed/pull/1"},
+	), "\n")
 	if err := os.WriteFile(fakeGh, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +82,6 @@ func useFakeGh(t *testing.T) {
 func TestDispatchRunPrintsPickedSection(t *testing.T) {
 	repo := oneTarget(t)
 	useFakeClaude(t)
-	useFakeGh(t)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"run"}, &stdout, &stderr)
 	if code != 0 {
@@ -220,5 +226,21 @@ func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
 	}, "\n") + "\n"
 	if secondStdout.String() != want {
 		t.Fatalf("second run stdout = %q, want %q", secondStdout.String(), want)
+	}
+}
+
+func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
+	oneTarget(t)
+	useFakeGh(t, `echo '{"state":"MERGED","url":"https://github.com/foreverfl/feed/pull/1"}'`, "exit 0")
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	want := strings.Join([]string{
+		"skip feed: PR merged",
+		"plan.md: nothing to take",
+	}, "\n") + "\n"
+	if stdout.String() != want {
+		t.Fatalf("a heading whose PR was merged should be skipped, got %q", stdout.String())
 	}
 }

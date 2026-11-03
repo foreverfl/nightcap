@@ -7,9 +7,12 @@ type State struct {
 	Sections map[string]Section `json:"sections"`
 }
 
-// Section is how each unit of one heading ended, keyed by unit slug.
+// Section is one heading's PR as gh last reported it and how each of its units ended, keyed by unit title.
+// PRURL and PRState are a record for people; run decides from gh on every run, never from these.
 type Section struct {
-	Units map[string]Unit `json:"units"`
+	PRURL   string          `json:"pr_url"`
+	PRState string          `json:"pr_state"` // OPEN, MERGED or CLOSED; empty when there is no PR
+	Units   map[string]Unit `json:"units"`
 }
 
 // Unit is how one unit ended after its last round.

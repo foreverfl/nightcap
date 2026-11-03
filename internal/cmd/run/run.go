@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 
 	"nightcap/internal/check"
 	"nightcap/internal/client/claude"
@@ -46,10 +47,25 @@ func Run(args []string, stdout io.Writer) error {
 			return err
 		}
 		var notBlocked []plan.Section
+		hasPR := map[string]bool{}
 		for _, section := range plan.Parse(string(planText)) {
 			if state.IsBlocked(saved.Sections[section.Slug]) {
 				fmt.Fprintf(stdout, "skip %s: blocked\n", section.Title)
 				continue
+			}
+			if len(section.Units) > 0 {
+				view, err := pr.ViewBranch(target.Repo, section.Type+"/"+section.Slug)
+				if err != nil {
+					return err
+				}
+				if err := state.SavePRStatus(statePath, section.Slug, view.URL, view.State); err != nil {
+					return err
+				}
+				if view.State == "MERGED" || view.State == "CLOSED" {
+					fmt.Fprintf(stdout, "skip %s: PR %s\n", section.Title, strings.ToLower(view.State))
+					continue
+				}
+				hasPR[section.Slug] = view.State == "OPEN"
 			}
 			notBlocked = append(notBlocked, section)
 		}
@@ -79,7 +95,7 @@ func Run(args []string, stdout io.Writer) error {
 			if err := runUnit(ctx, stdout, loaded, target, dir, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
-			if err := openDraftPR(stdout, statePath, dir, section, unit.Title); err != nil {
+			if err := openDraftPR(stdout, statePath, dir, section, unit.Title, hasPR[section.Slug]); err != nil {
 				return err
 			}
 			break
@@ -179,8 +195,8 @@ func classifyBranch(stdout io.Writer, dir string, target config.Target, unit pla
 }
 
 // openDraftPR pushes section's branch from dir and opens a draft PR once unitTitle has ended green or read-code
-// in the state file at statePath. It returns an error when git, gh or the state file fails.
-func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, unitTitle string) error {
+// in the state file at statePath; with hasPR it only pushes. It returns an error when git, gh or the state file fails.
+func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, unitTitle string, hasPR bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -193,10 +209,13 @@ func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, 
 	if err := git.Push(dir, section.Type+"/"+section.Slug); err != nil {
 		return err
 	}
+	if hasPR {
+		return nil
+	}
 	prURL, err := pr.CreateDraft(dir, section.Type+": "+section.Title, section.Summary)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "  draft PR: %s\n", prURL)
-	return nil
+	return state.SavePRStatus(statePath, section.Slug, prURL, "OPEN")
 }
