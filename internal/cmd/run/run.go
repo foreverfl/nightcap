@@ -14,6 +14,7 @@ import (
 	"nightcap/internal/config"
 	"nightcap/internal/git"
 	"nightcap/internal/plan"
+	"nightcap/internal/state"
 )
 
 // Run is the "run" subcommand; args is everything after "run", where --section names one heading.
@@ -38,7 +39,20 @@ func Run(args []string, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
-		section, ok := plan.Pick(plan.Parse(string(planText)), *sectionName)
+		statePath := filepath.Join(target.Repo, ".nightcap", "state.json")
+		saved, err := state.Load(statePath)
+		if err != nil {
+			return err
+		}
+		var notBlocked []plan.Section
+		for _, section := range plan.Parse(string(planText)) {
+			if state.IsBlocked(saved.Sections[section.Slug]) {
+				fmt.Fprintf(stdout, "skip %s: blocked\n", section.Title)
+				continue
+			}
+			notBlocked = append(notBlocked, section)
+		}
+		section, ok := plan.Pick(notBlocked, *sectionName)
 		if !ok {
 			fmt.Fprintf(stdout, "%s: nothing to take\n", target.Plan)
 			continue
@@ -61,7 +75,7 @@ func Run(args []string, stdout io.Writer) error {
 			if !unit.HasCheck {
 				continue
 			}
-			if err := runUnit(ctx, stdout, loaded, target, dir, section.Slug, index+1, unit); err != nil {
+			if err := runUnit(ctx, stdout, loaded, target, dir, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
 			break
@@ -72,10 +86,13 @@ func Run(args []string, stdout io.Writer) error {
 
 // runUnit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail or a red verdict's
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
-// or claude stops before Done. It returns an error only when claude, sh or git cannot run.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, slug string, number int, unit plan.Unit) error {
+// or claude stops before Done. Every round's outcome goes into the state file at statePath.
+// It returns an error only when claude, sh, git or the state file fails.
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, slug string, number int, unit plan.Unit, statePath string) error {
 	failureTail := ""
+	record := state.Unit{}
 	for round := 1; round <= loaded.MaxRounds; round++ {
+		record.Attempts = round
 		logPath := filepath.Join(target.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
 		result, err := claude.RunRound(ctx, dir, BuildPrompt(unit.Body, failureTail), loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
@@ -92,16 +109,25 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		}
 		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
 		failure := checked.Tail
+		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
 		if checked.Green {
 			verdict, err := classifyBranch(stdout, dir, target, unit)
 			if err != nil {
 				return err
 			}
+			record.Reason = verdict.Reason
 			if !verdict.Red {
-				return nil
+				record.Result = "green"
+				if verdict.ReadCode {
+					record.Result = "read-code"
+				}
+				return state.SaveUnit(statePath, slug, unit.Title, record)
 			}
 			failure = verdict.Reason
+		}
+		if err := state.SaveUnit(statePath, slug, unit.Title, record); err != nil {
+			return err
 		}
 		sameFailureAsLastRound := round > 1 && failure == failureTail
 		if sameFailureAsLastRound {
@@ -110,7 +136,8 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		failureTail = failure
 	}
 	fmt.Fprintln(stdout, "  blocked")
-	return nil
+	record.Result = "blocked"
+	return state.SaveUnit(statePath, slug, unit.Title, record)
 }
 
 // color names a check result the way the plan file does: "green" for pass, "red" for fail.
