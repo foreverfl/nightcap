@@ -2,11 +2,23 @@
 {{.Summary}}
 
 ## 읽는 순서
-{{range .Units}}- {{.What}}: {{.Done}}
-{{end}}
+{{- range .Units}}
+- {{.What}}: {{.Done}}
+{{- end}}
+
 ## 위험
-{{range .Units}}{{if .ReadCodeReason}}- 코드까지 읽어야 함: {{.ReadCodeReason}}
-{{end}}{{end}}
+{{- range .Units}}
+  {{- if .ReadCodeReason}}
+- 코드까지 읽어야 함: {{.ReadCodeReason}}
+  {{- end}}
+{{- end}}
+{{- range .Risks}}
+- {{.}}
+{{- end}}
+{{- if .HasNoRisk}}
+- 없음
+{{- end}}
+
 ## 확인한 것
 ```
 {{.CheckTail}}

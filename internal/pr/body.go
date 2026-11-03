@@ -2,6 +2,7 @@ package pr
 
 import (
 	_ "embed"
+	"slices"
 	"strings"
 	"text/template"
 )
@@ -18,11 +19,19 @@ type BodyUnit struct {
 	ReadCodeReason string
 }
 
-// BodyInput is everything the PR description is built from: the line under the heading, the finished units and the last check's tail.
+// BodyInput is everything the PR description is built from: the line under the heading, the finished units,
+// the lines RiskLines picked from the diff and the last check's tail.
 type BodyInput struct {
 	Summary   string
 	Units     []BodyUnit
+	Risks     []string
 	CheckTail string
+}
+
+// HasNoRisk reports whether the risk section would be empty: no read-code reason and no risk line.
+func (input BodyInput) HasNoRisk() bool {
+	hasReadCode := slices.ContainsFunc(input.Units, func(unit BodyUnit) bool { return unit.ReadCodeReason != "" })
+	return !hasReadCode && len(input.Risks) == 0
 }
 
 // BuildBody fills prompts/pr.md with input and returns the Korean half of the PR description.

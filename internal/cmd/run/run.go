@@ -210,7 +210,17 @@ func openDraftPR(stdout io.Writer, statePath, dir string, section plan.Section, 
 	if err := git.Push(dir, branch); err != nil {
 		return err
 	}
-	body, err := pr.BuildBody(bodyInput(section, saved.Sections[section.Slug], unitTitle))
+	changes, err := git.ChangedFiles(dir)
+	if err != nil {
+		return err
+	}
+	addedLines, err := git.AddedLines(dir)
+	if err != nil {
+		return err
+	}
+	input := bodyInput(section, saved.Sections[section.Slug], unitTitle)
+	input.Risks = pr.RiskLines(changes, addedLines)
+	body, err := pr.BuildBody(input)
 	if err != nil {
 		return err
 	}

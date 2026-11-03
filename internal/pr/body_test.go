@@ -37,3 +37,30 @@ func TestBuildBodyListsUnitsAndTheReadCodeReason(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", body, want)
 	}
 }
+
+// riskSection returns the lines of body between "## 위험" and "## 확인한 것".
+func riskSection(body string) string {
+	_, afterRisk, _ := strings.Cut(body, "## 위험\n")
+	risk, _, _ := strings.Cut(afterRisk, "\n## 확인한 것")
+	return risk
+}
+
+func TestBuildBodyListsRiskLines(t *testing.T) {
+	body, err := BuildBody(BodyInput{Risks: []string{"env: internal/feed/client.go"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if risk := riskSection(body); risk != "- env: internal/feed/client.go\n" {
+		t.Fatalf("the risk section should hold the one risk line, got %q", risk)
+	}
+}
+
+func TestBuildBodyWithNothingRiskySaysNone(t *testing.T) {
+	body, err := BuildBody(BodyInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if risk := riskSection(body); risk != "- 없음\n" {
+		t.Fatalf("with nothing risky the risk section should say 없음, got %q", risk)
+	}
+}
