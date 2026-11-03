@@ -246,3 +246,50 @@ func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
 		t.Fatalf("a heading whose PR was merged should be skipped, got %q", stdout.String())
 	}
 }
+
+func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
+	repo := oneTarget(t)
+	useFakeClaude(t)
+	planText := []byte(strings.Join([]string{
+		"## feat: feed (feed)",
+		"",
+		"- [ ] add it",
+		"  - DONE  go test passes",
+		"",
+		"## feat: feed page (feed-page)",
+		"",
+		"- [ ] show it",
+		"  - DONE  go test passes",
+	}, "\n") + "\n")
+	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", repo, "branch", "feat/feed").CombinedOutput(); err != nil {
+		t.Fatalf("git branch: %v\n%s", err, output)
+	}
+	ghCallsPath := filepath.Join(t.TempDir(), "gh-calls")
+	fakeGh := filepath.Join(t.TempDir(), "gh")
+	script := strings.Join([]string{
+		"#!/bin/sh",
+		`echo "$@" >> ` + ghCallsPath,
+		`if [ "$2" = "view" ] && [ "$3" = "feat/feed" ]; then echo '{"state":"OPEN","url":"https://github.com/foreverfl/feed/pull/1"}'; exit 0; fi`,
+		`if [ "$2" = "view" ]; then echo 'no pull requests found' >&2; exit 1; fi`,
+		"echo https://github.com/foreverfl/feed/pull/2",
+	}, "\n")
+	if err := os.WriteFile(fakeGh, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NIGHTCAP_GH", fakeGh)
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run", "--section", "feed-page"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	ghCalls, err := os.ReadFile(ghCallsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createIndex := strings.Index(string(ghCalls), "pr create ")
+	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --draft --base feat/feed ") {
+		t.Fatalf("the PR should be opened onto feat/feed, got gh calls:\n%s", ghCalls)
+	}
+}

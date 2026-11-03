@@ -49,7 +49,14 @@ func Run(args []string, stdout io.Writer) error {
 		}
 		var notBlocked []plan.Section
 		hasPR := map[string]bool{}
+		baseFor := map[string]string{}
+		previousOpenBranch := ""
 		for _, section := range plan.Parse(string(planText)) {
+			baseFor[section.Slug] = "main"
+			if previousOpenBranch != "" {
+				baseFor[section.Slug] = previousOpenBranch
+			}
+			previousOpenBranch = ""
 			if state.IsBlocked(saved.Sections[section.Slug]) {
 				fmt.Fprintf(stdout, "skip %s: blocked\n", section.Title)
 				continue
@@ -67,6 +74,9 @@ func Run(args []string, stdout io.Writer) error {
 					continue
 				}
 				hasPR[section.Slug] = view.State == "OPEN"
+				if hasPR[section.Slug] {
+					previousOpenBranch = section.Type + "/" + section.Slug
+				}
 			}
 			notBlocked = append(notBlocked, section)
 		}
@@ -75,7 +85,7 @@ func Run(args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, "%s: nothing to take\n", target.Plan)
 			continue
 		}
-		base := "main"
+		base := baseFor[section.Slug]
 		branch := section.Type + "/" + section.Slug
 		worktreeDir, err := git.AddWorktree(target.Repo, base, branch, section.Slug)
 		if err != nil {
