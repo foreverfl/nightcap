@@ -2,12 +2,13 @@ package config
 
 // Config is nightcap.yml in the current folder: shared limits plus one Target per plan file.
 type Config struct {
-	MaxTurns     int      `yaml:"max_turns"`
-	MaxRounds    int      `yaml:"max_rounds"`
-	WorkStart    string   `yaml:"work_start"`    // "HH:MM" local time
-	UsageStop    int      `yaml:"usage_stop"`    // window usage % at which no new unit starts; 0 means no cap
-	AllowedTools []string `yaml:"allowed_tools"` // claude --allowedTools; read, edit, and only local commands
-	Targets      []Target `yaml:"targets"`
+	MaxTurns       int      `yaml:"max_turns"`
+	MaxRounds      int      `yaml:"max_rounds"`
+	WorkStart      string   `yaml:"work_start"`       // "HH:MM" local time
+	LimitSession   int      `yaml:"limit_session"`    // 5h window % above which no new unit starts; 0 means no cap
+	LimitWeeklyAll int      `yaml:"limit_weekly_all"` // weekly all-models % above which no new unit starts; 0 means no cap
+	AllowedTools   []string `yaml:"allowed_tools"`    // claude --allowedTools; read, edit, and only local commands
+	Targets        []Target `yaml:"targets"`
 }
 
 // Target pairs one plan file with the repo its units commit to.

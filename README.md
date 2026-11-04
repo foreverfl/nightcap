@@ -14,7 +14,8 @@ Write `nightcap.yml` next to the binary (it is gitignored) and run `nightcap run
 
 ```yaml
 work_start: "09:00"        # leave empty for no before-work limit; when set, no new usage window opens within 5h of it
-usage_stop: 80             # no new unit starts once the usage window is past this %; 0 or missing means no cap
+limit_session: 80          # no new unit starts while the 5h window is above this %
+limit_weekly_all: 80       # no new unit starts while the weekly % is above this; ignored within 24h of its reset
 max_turns: 30
 max_rounds: 3
 targets:

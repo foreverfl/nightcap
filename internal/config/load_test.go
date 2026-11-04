@@ -87,12 +87,12 @@ func TestLoadReadsWorkStart(t *testing.T) {
 	}
 }
 
-func TestLoadReadsUsageStop(t *testing.T) {
-	got, err := loadFrom(t, "usage_stop: 80\n"+oneConfig())
+func TestLoadReadsLimits(t *testing.T) {
+	got, err := loadFrom(t, "limit_session: 80\nlimit_weekly_all: 60\n"+oneConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.UsageStop != 80 {
-		t.Fatalf("UsageStop = %d, want 80", got.UsageStop)
+	if got.LimitSession != 80 || got.LimitWeeklyAll != 60 {
+		t.Fatalf("LimitSession, LimitWeeklyAll = %d, %d, want 80, 60", got.LimitSession, got.LimitWeeklyAll)
 	}
 }

@@ -14,7 +14,8 @@
 
 ```yaml
 work_start: "09:00"        # 비우면 출근 전 제한 없음. 적으면 이 시각 5시간 전부터 새 창을 열지 않는다
-usage_stop: 80             # 창 사용량이 이 %를 넘으면 새 유닛을 열지 않는다. 0이거나 없으면 상한 없음
+limit_session: 80          # 5시간 창 %가 이 위면 새 유닛을 안 연다
+limit_weekly_all: 80       # 주간 %가 이 위면 새 유닛을 안 연다. 리셋 24시간 안이면 무시
 max_turns: 30
 max_rounds: 3
 targets:
