@@ -2,9 +2,6 @@ package claude
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"os/exec"
 	"strings"
 )
 
@@ -18,25 +15,4 @@ var translateInstructions = strings.Join([]string{
 // and returns the translation. It returns an error when claude fails or does not answer with a finished result.
 func Translate(ctx context.Context, korean string) (string, error) {
 	return askOnce(ctx, "translate", translateInstructions+"\n\n"+korean)
-}
-
-// askOnce runs claude on prompt in one turn with no tools and returns its answer; what names the call in errors.
-// It returns an error when claude fails or does not answer with a finished result.
-func askOnce(ctx context.Context, what, prompt string) (string, error) {
-	command := exec.CommandContext(ctx, claudeBinary(), "-p", prompt, "--max-turns", "1", "--output-format", "json")
-	output, err := command.Output()
-	if exitErr, isExitErr := errors.AsType[*exec.ExitError](err); isExitErr {
-		return "", fmt.Errorf("claude %s: %w\n%s", what, err, exitErr.Stderr)
-	}
-	if err != nil {
-		return "", err
-	}
-	result, err := ParseResult(output)
-	if err != nil {
-		return "", err
-	}
-	if result.Outcome != Done {
-		return "", fmt.Errorf("claude %s ended %s: %s", what, result.Outcome, result.Text)
-	}
-	return result.Text, nil
 }
