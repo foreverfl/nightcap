@@ -241,6 +241,12 @@ func openDraftPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, 
 	}
 	input := bodyInput(section, saved.Sections[section.Slug], unitTitle)
 	input.Risks = pr.RiskLines(changes, addedLines)
+	diff, err := git.Diff(worktreeDir, base)
+	if err != nil {
+		return err
+	}
+	reviewOrder, reviewOrderErr := claude.ReviewOrder(ctx, diff)
+	input.ReviewOrder, input.IsMissingReviewOrder = reviewOrder, reviewOrderErr != nil
 	var body string
 	if isEnglishWanted {
 		translate := func(korean string) (string, error) { return claude.Translate(ctx, korean) }

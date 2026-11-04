@@ -52,3 +52,8 @@ func AddedLines(worktreeDir, base string) ([]AddedLine, error) {
 	}
 	return lines, nil
 }
+
+// Diff returns the whole diff of worktreeDir's branch since it left base. It returns an error when git fails.
+func Diff(worktreeDir, base string) (string, error) {
+	return runGit(worktreeDir, "diff", base+"...HEAD")
+}
