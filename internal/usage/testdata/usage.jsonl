@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init"}
+{"type":"assistant","usage_report":{"rate_limits":{"limits":[{"kind":"session","percent":15,"resets_at":"2026-11-04T19:40:00.188163+00:00"},{"kind":"weekly_all","percent":35,"resets_at":"2026-11-08T23:00:00.188185+00:00"},{"kind":"weekly_scoped","percent":55,"resets_at":"2026-11-08T23:00:00.188341+00:00"}]}}}
+{"type":"result","subtype":"success"}
