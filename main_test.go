@@ -286,3 +286,52 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 		t.Fatalf("the PR should be opened onto feat/feed, got gh calls:\n%s", ghCalls)
 	}
 }
+
+// oneLintPlan is the smallest plan lint passes: one typed heading with one unit that has a check.
+func oneLintPlan() string {
+	return "## feat: a (b)\n" +
+		"- [ ] read the docs\n" +
+		"  - DONE  go test ./... passes\n"
+}
+
+// runLint writes plan to a temp file, runs nightcap lint on it, and returns the exit code and stdout.
+func runLint(t *testing.T, plan string) (int, string) {
+	t.Helper()
+	planPath := filepath.Join(t.TempDir(), "plan.md")
+	if err := os.WriteFile(planPath, []byte(plan), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := dispatch([]string{"lint", planPath}, &stdout, &stderr)
+	return code, stdout.String()
+}
+
+func TestLintPlanWithoutTypedHeadingExits1(t *testing.T) {
+	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## feat: a (b)", "## cmd", 1))
+	if code != 1 || stdout != "no heading with type: slug\n" {
+		t.Fatalf("want exit 1 and the no-heading line, got %d %q", code, stdout)
+	}
+}
+
+func TestLintUnitWithoutCheckExits1(t *testing.T) {
+	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "go test ./... passes", "테스트가 없음", 1))
+	want := "heading: feat: a (b)\n  no check: read the docs\n"
+	if code != 1 || stdout != want {
+		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
+	}
+}
+
+func TestLintPrintsAPersonHeadingAsPerson(t *testing.T) {
+	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## feat:", "## 👤 feat:", 1))
+	if code != 0 || stdout != "person: feat: a (b)\n" {
+		t.Fatalf("want exit 0 and %q, got %d %q", "person: feat: a (b)\n", code, stdout)
+	}
+}
+
+func TestLintWherePathWithASpaceExits1(t *testing.T) {
+	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "  - DONE", "  - WHERE (blog-v2) a b/\n  - DONE", 1))
+	want := "heading: feat: a (b)\n  WHERE path not readable: a b/\n"
+	if code != 1 || stdout != want {
+		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
+	}
+}
