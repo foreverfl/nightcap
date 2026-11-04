@@ -11,9 +11,9 @@ import (
 	"testing"
 )
 
-// oneTarget makes a temp folder holding a git repo with a bare origin, a one-unit plan and a nightcap.yml
+// setUpRepoWithOneUnitPlan makes a temp folder holding a git repo with a bare origin, a one-unit plan and a nightcap.yml
 // pointing at both, swaps in a fake gh with no PR, moves into it, and returns the repo path.
-func oneTarget(t *testing.T) string {
+func setUpRepoWithOneUnitPlan(t *testing.T) string {
 	t.Helper()
 	t.Chdir(t.TempDir())
 	repo, _ := filepath.Abs("repo")
@@ -85,7 +85,7 @@ func useFakeGh(t *testing.T, prStates map[string]string) string {
 }
 
 func TestDispatchRunPrintsPickedSection(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"run"}, &stdout, &stderr)
@@ -111,7 +111,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 }
 
 func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	yml := []byte(strings.Join([]string{
 		"max_rounds: 2",
@@ -137,7 +137,7 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 }
 
 func TestRunMarksUnitBlockedWhenTheSameFailureRepeats(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	yml := []byte(strings.Join([]string{
 		"max_rounds: 3",
@@ -171,7 +171,7 @@ func TestDispatchUnknownCommandPrintsUsageAndExits2(t *testing.T) {
 }
 
 func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	fakeClaude := filepath.Join(t.TempDir(), "claude")
 	script := strings.Join([]string{
 		"#!/bin/sh",
@@ -208,7 +208,7 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 }
 
 func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	yml := []byte(strings.Join([]string{
 		"max_rounds: 2",
@@ -237,7 +237,7 @@ func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
 }
 
 func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
-	oneTarget(t)
+	setUpRepoWithOneUnitPlan(t)
 	useFakeGh(t, map[string]string{"feat/feed": "MERGED"})
 	var stdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
@@ -253,7 +253,7 @@ func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
 }
 
 func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	planText := []byte(strings.Join([]string{
 		"## feat: feed (feed)",
