@@ -5,6 +5,7 @@ type Config struct {
 	MaxTurns     int      `yaml:"max_turns"`
 	MaxRounds    int      `yaml:"max_rounds"`
 	WorkStart    string   `yaml:"work_start"`    // "HH:MM" local time
+	UsageStop    int      `yaml:"usage_stop"`    // window usage % at which no new unit starts; 0 means no cap
 	AllowedTools []string `yaml:"allowed_tools"` // claude --allowedTools; read, edit, and only local commands
 	Targets      []Target `yaml:"targets"`
 }

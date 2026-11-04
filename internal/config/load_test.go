@@ -86,3 +86,13 @@ func TestLoadReadsWorkStart(t *testing.T) {
 		t.Fatalf("WorkStart = %q, want 12:00", got.WorkStart)
 	}
 }
+
+func TestLoadReadsUsageStop(t *testing.T) {
+	got, err := loadFrom(t, "usage_stop: 80\n"+oneConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.UsageStop != 80 {
+		t.Fatalf("UsageStop = %d, want 80", got.UsageStop)
+	}
+}
