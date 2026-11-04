@@ -51,12 +51,16 @@ func Run(args []string, stdout io.Writer) error {
 		hasPR := map[string]bool{}
 		baseFor := map[string]string{}
 		previousOpenBranch := ""
+		stackOnto := map[string]string{}
+		previousOpenURL := ""
 		for _, section := range plan.Parse(string(planText)) {
 			baseFor[section.Slug] = "main"
 			if previousOpenBranch != "" {
 				baseFor[section.Slug] = previousOpenBranch
 			}
+			stackOnto[section.Slug] = previousOpenURL
 			previousOpenBranch = ""
+			previousOpenURL = ""
 			if state.IsBlocked(saved.Sections[section.Slug]) {
 				fmt.Fprintf(stdout, "skip %s: blocked\n", section.Title)
 				continue
@@ -76,6 +80,7 @@ func Run(args []string, stdout io.Writer) error {
 				hasPR[section.Slug] = view.State == "OPEN"
 				if hasPR[section.Slug] {
 					previousOpenBranch = section.Type + "/" + section.Slug
+					previousOpenURL = view.URL
 				}
 			}
 			notBlocked = append(notBlocked, section)
@@ -107,7 +112,7 @@ func Run(args []string, stdout io.Writer) error {
 			if err := runUnit(ctx, stdout, loaded, target, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
-			if err := openDraftPR(ctx, stdout, statePath, worktreeDir, base, section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
+			if err := openDraftPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
 				return err
 			}
 			if err := markReadyWhenFinished(stdout, statePath, worktreeDir, section); err != nil {
@@ -211,8 +216,8 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Ta
 
 // openDraftPR pushes section's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
 // then opens a draft PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
-// isEnglishWanted). It returns an error when git, gh or the state file fails.
-func openDraftPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
+// isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack. It returns an error when git, gh or the state file fails.
+func openDraftPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -254,6 +259,11 @@ func openDraftPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, 
 		return err
 	}
 	fmt.Fprintf(stdout, "  draft PR: %s\n", prURL)
+	if previousURL != "" {
+		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
+			return err
+		}
+	}
 	return state.SavePRStatus(statePath, section.Slug, prURL, "OPEN")
 }
 
