@@ -327,3 +327,11 @@ func TestLintPrintsAPersonHeadingAsPerson(t *testing.T) {
 		t.Fatalf("want exit 0 and %q, got %d %q", "person: feat: a (b)\n", code, stdout)
 	}
 }
+
+func TestLintWherePathWithASpaceExits1(t *testing.T) {
+	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "  - DONE", "  - WHERE (blog-v2) a b/\n  - DONE", 1))
+	want := "heading: feat: a (b)\n  WHERE path not readable: a b/\n"
+	if code != 1 || stdout != want {
+		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
+	}
+}
