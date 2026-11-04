@@ -2,11 +2,12 @@ package plan
 
 // Section is one "## type: title (slug)" heading; it becomes one branch and one PR.
 type Section struct {
-	Type    string // feat, fix, test, docs, refactor or chore
-	Title   string
-	Slug    string // branch is Type + "/" + Slug
-	Summary string // first plain line under the heading, used as the PR body's first sentence
-	Units   []Unit // open "- [ ]" units only
+	Type     string // feat, fix, test, docs, refactor or chore
+	Title    string
+	Slug     string // branch is Type + "/" + Slug
+	Summary  string // first plain line under the heading, used as the PR body's first sentence
+	Units    []Unit // open "- [ ]" units only
+	IsPerson bool   // the heading starts with 👤: a person does this PR by hand, so a night run never takes it
 }
 
 // Unit is one open checkbox under a Section; it becomes one commit.

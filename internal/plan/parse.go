@@ -76,9 +76,12 @@ func Parse(text string) []Section {
 }
 
 // Pick returns the section whose Title or Slug equals name, or with an empty name
-// the first section that has a unit a night run can take; ok is false when none matches.
+// the first section that has a unit a night run can take, never one marked 👤; ok is false when none matches.
 func Pick(sections []Section, name string) (Section, bool) {
 	for _, section := range sections {
+		if section.IsPerson {
+			continue
+		}
 		if name != "" {
 			if section.Title == name || section.Slug == name {
 				return section, true
@@ -94,9 +97,10 @@ func Pick(sections []Section, name string) (Section, bool) {
 	return Section{}, false
 }
 
-// parseHeading splits "## feat: title (slug)" into a Section; ok is false for any other heading.
+// parseHeading splits "## feat: title (slug)", or "## 👤 feat: title (slug)" with IsPerson, into a Section; ok is false for any other heading.
 func parseHeading(line string) (Section, bool) {
 	text := strings.TrimSpace(strings.TrimLeft(line, "#"))
+	text, isPerson := strings.CutPrefix(text, "👤 ")
 	sectionType, rest, found := strings.Cut(text, ": ")
 	if !found || !isSectionType(sectionType) || !strings.HasSuffix(rest, ")") {
 		return Section{}, false
@@ -106,9 +110,10 @@ func parseHeading(line string) (Section, bool) {
 		return Section{}, false
 	}
 	return Section{
-		Type:  sectionType,
-		Title: rest[:open],
-		Slug:  rest[open+2 : len(rest)-1],
+		Type:     sectionType,
+		Title:    rest[:open],
+		Slug:     rest[open+2 : len(rest)-1],
+		IsPerson: isPerson,
 	}, true
 }
 

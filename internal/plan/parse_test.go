@@ -105,3 +105,17 @@ func TestParseReadsExamplePlans(t *testing.T) {
 		}
 	}
 }
+
+func TestPickNeverTakesAPersonHeading(t *testing.T) {
+	person := strings.Replace(oneSection(), "## feat:", "## 👤 feat:", 1)
+	sections := Parse(person)
+	if len(sections) != 1 || !sections[0].IsPerson || sections[0].Type != "feat" {
+		t.Fatalf("a 👤 heading should parse as a person section of type feat, got %+v", sections)
+	}
+	if _, ok := Pick(sections, ""); ok {
+		t.Fatal("Pick should not take a 👤 heading")
+	}
+	if _, ok := Pick(sections, "home-feed"); ok {
+		t.Fatal("Pick should not take a 👤 heading even by name")
+	}
+}

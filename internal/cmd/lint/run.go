@@ -9,7 +9,7 @@ import (
 	"nightcap/internal/plan"
 )
 
-// Run is the "lint" subcommand; args[0] is the plan file. It prints every heading a night run can read
+// Run is the "lint" subcommand; args[0] is the plan file. It prints every heading a night run can read, each 👤 heading as person,
 // and every open unit whose DONE names no check, and returns an error when the file has no readable heading,
 // a unit has no check, or the file cannot be read.
 func Run(args []string, stdout io.Writer) error {
@@ -27,6 +27,10 @@ func Run(args []string, stdout io.Writer) error {
 	}
 	hasProblem := false
 	for _, section := range sections {
+		if section.IsPerson {
+			fmt.Fprintf(stdout, "person: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
+			continue
+		}
 		fmt.Fprintf(stdout, "heading: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
 		for _, unit := range section.Units {
 			if !unit.HasCheck {
