@@ -5,11 +5,12 @@ import (
 	"io"
 	"os"
 
+	"nightcap/internal/cmd/lint"
 	"nightcap/internal/cmd/run"
 	"nightcap/internal/cmd/status"
 )
 
-const usage = "usage: nightcap run [plan] [--section <title>] | nightcap status [plan]\n"
+const usage = "usage: nightcap run [plan] [--section <title>] | nightcap status [plan] | nightcap lint <plan>\n"
 
 func main() {
 	os.Exit(dispatch(os.Args[1:], os.Stdout, os.Stderr))
@@ -28,6 +29,8 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		err = run.Run(args[1:], stdout)
 	case "status":
 		err = status.Run(args[1:], stdout)
+	case "lint":
+		err = lint.Run(args[1:], stdout)
 	default:
 		fmt.Fprint(stderr, usage)
 		return 2

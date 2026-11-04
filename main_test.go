@@ -286,3 +286,28 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 		t.Fatalf("the PR should be opened onto feat/feed, got gh calls:\n%s", ghCalls)
 	}
 }
+
+func TestLintPlanWithoutTypedHeadingExits1(t *testing.T) {
+	planPath := filepath.Join(t.TempDir(), "plan.md")
+	if err := os.WriteFile(planPath, []byte("## cmd\n\n- [ ] a\n  - DONE  go test 통과\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := dispatch([]string{"lint", planPath}, &stdout, &stderr)
+	if code != 1 || stdout.String() != "no heading with type: slug\n" {
+		t.Fatalf("want exit 1 and the no-heading line, got %d %q", code, stdout.String())
+	}
+}
+
+func TestLintUnitWithoutCheckExits1(t *testing.T) {
+	planPath := filepath.Join(t.TempDir(), "plan.md")
+	if err := os.WriteFile(planPath, []byte("## feat: a (b)\n\n- [ ] read the docs\n  - DONE  읽었다\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := dispatch([]string{"lint", planPath}, &stdout, &stderr)
+	want := "heading: feat: a (b)\n  no check: read the docs\n"
+	if code != 1 || stdout.String() != want {
+		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout.String())
+	}
+}
