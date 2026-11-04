@@ -76,3 +76,29 @@ func TestBuildBilingualBodyWithoutTranslationSaysEnglishIsMissing(t *testing.T) 
 		t.Fatalf("a failed translation should leave only 영문 없음 in the risk section, got %q", risk)
 	}
 }
+
+func TestBuildBodyPutsTheReviewOrderInPlaceOfTheUnitList(t *testing.T) {
+	body, err := BuildBody(BodyInput{
+		Units:       []BodyUnit{{What: "피드 목록", Done: "go test 통과"}},
+		ReviewOrder: "흐름 1. 실행할 때: 피드를 읽는다",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body, "## 읽는 순서\n흐름 1. 실행할 때: 피드를 읽는다\n") {
+		t.Fatalf("the review order should sit under ## 읽는 순서, got:\n%s", body)
+	}
+	if strings.Contains(body, "- 피드 목록: go test 통과") {
+		t.Fatalf("with a review order the unit list should be gone, got:\n%s", body)
+	}
+}
+
+func TestBuildBodyWhenClaudeFailedTheReviewOrderWarnsInTheRiskSection(t *testing.T) {
+	body, err := BuildBody(BodyInput{IsMissingReviewOrder: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if risk := riskSection(body); risk != "- 읽는 순서 없음\n" {
+		t.Fatalf("a failed review order should leave only 읽는 순서 없음 in the risk section, got %q", risk)
+	}
+}

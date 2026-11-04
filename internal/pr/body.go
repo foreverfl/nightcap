@@ -20,20 +20,22 @@ type BodyUnit struct {
 }
 
 // BodyInput is everything the PR description is built from: the line under the heading, the finished units,
-// the lines RiskLines picked from the diff and the last check's tail.
+// the lines RiskLines picked from the diff, the flows ReviewOrder wrote and the last check's tail.
 type BodyInput struct {
-	Summary   string
-	Units     []BodyUnit
-	Risks     []string
-	CheckTail string
+	Summary     string
+	Units       []BodyUnit
+	Risks       []string
+	CheckTail   string
+	ReviewOrder string // the flows claude wrote from the diff; empty means list each unit's WHAT and DONE instead
 
-	IsMissingEnglish bool // translation failed, so the risk section opens with "영문 없음"
+	IsMissingEnglish     bool // translation failed, so the risk section opens with "영문 없음"
+	IsMissingReviewOrder bool // claude could not write the review order, so the risk section says "읽는 순서 없음"
 }
 
-// HasNoRisk reports whether the risk section would be empty: no missing English, no read-code reason and no risk line.
+// HasNoRisk reports whether the risk section would be empty: no missing English or review order, no read-code reason and no risk line.
 func (input BodyInput) HasNoRisk() bool {
 	hasReadCode := slices.ContainsFunc(input.Units, func(unit BodyUnit) bool { return unit.ReadCodeReason != "" })
-	return !input.IsMissingEnglish && !hasReadCode && len(input.Risks) == 0
+	return !input.IsMissingEnglish && !input.IsMissingReviewOrder && !hasReadCode && len(input.Risks) == 0
 }
 
 // BuildBody fills prompts/pr.md with input and returns the Korean half of the PR description.
