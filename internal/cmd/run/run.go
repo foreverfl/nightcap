@@ -8,12 +8,15 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"nightcap/internal/check"
 	"nightcap/internal/client/claude"
 	"nightcap/internal/config"
 	"nightcap/internal/git"
 	"nightcap/internal/plan"
+	"nightcap/internal/pr"
 	"nightcap/internal/state"
 )
 
@@ -45,10 +48,40 @@ func Run(args []string, stdout io.Writer) error {
 			return err
 		}
 		var notBlocked []plan.Section
+		hasPR := map[string]bool{}
+		baseFor := map[string]string{}
+		previousOpenBranch := ""
+		stackOnto := map[string]string{}
+		previousOpenURL := ""
 		for _, section := range plan.Parse(string(planText)) {
+			baseFor[section.Slug] = "main"
+			if previousOpenBranch != "" {
+				baseFor[section.Slug] = previousOpenBranch
+			}
+			stackOnto[section.Slug] = previousOpenURL
+			previousOpenBranch = ""
+			previousOpenURL = ""
 			if state.IsBlocked(saved.Sections[section.Slug]) {
 				fmt.Fprintf(stdout, "skip %s: blocked\n", section.Title)
 				continue
+			}
+			if len(section.Units) > 0 {
+				view, err := pr.ViewBranch(target.Repo, section.Type+"/"+section.Slug)
+				if err != nil {
+					return err
+				}
+				if err := state.SavePRStatus(statePath, section.Slug, view.URL, view.State); err != nil {
+					return err
+				}
+				if view.State == "MERGED" || view.State == "CLOSED" {
+					fmt.Fprintf(stdout, "skip %s: PR %s\n", section.Title, strings.ToLower(view.State))
+					continue
+				}
+				hasPR[section.Slug] = view.State == "OPEN"
+				if hasPR[section.Slug] {
+					previousOpenBranch = section.Type + "/" + section.Slug
+					previousOpenURL = view.URL
+				}
 			}
 			notBlocked = append(notBlocked, section)
 		}
@@ -57,12 +90,13 @@ func Run(args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, "%s: nothing to take\n", target.Plan)
 			continue
 		}
+		base := baseFor[section.Slug]
 		branch := section.Type + "/" + section.Slug
-		dir, err := git.AddWorktree(target.Repo, branch, section.Slug)
+		worktreeDir, err := git.AddWorktree(target.Repo, base, branch, section.Slug)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", target.Plan, branch, dir)
+		fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", target.Plan, branch, worktreeDir)
 		for _, unit := range section.Units {
 			mark := "skip"
 			if unit.HasCheck {
@@ -75,7 +109,13 @@ func Run(args []string, stdout io.Writer) error {
 			if !unit.HasCheck {
 				continue
 			}
-			if err := runUnit(ctx, stdout, loaded, target, dir, section.Slug, index+1, unit, statePath); err != nil {
+			if err := runUnit(ctx, stdout, loaded, target, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
+				return err
+			}
+			if err := openDraftPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
+				return err
+			}
+			if err := markReadyWhenFinished(stdout, statePath, worktreeDir, section); err != nil {
 				return err
 			}
 			break
@@ -88,13 +128,13 @@ func Run(args []string, stdout io.Writer) error {
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
 // or claude stops before Done. Every round's outcome goes into the state file at statePath.
 // It returns an error only when claude, sh, git or the state file fails.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, dir, slug string, number int, unit plan.Unit, statePath string) error {
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, worktreeDir, base, slug string, number int, unit plan.Unit, statePath string) error {
 	failureTail := ""
 	record := state.Unit{}
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
 		logPath := filepath.Join(target.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
-		result, err := claude.RunRound(ctx, dir, BuildPrompt(unit.Body, failureTail), loaded.MaxTurns, loaded.AllowedTools, logPath)
+		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(unit.Body, failureTail), loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
 			return err
 		}
@@ -103,7 +143,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 			break
 		}
 		// 1. Check: run the check command from nightcap.yml (tests pass or not)
-		checked, err := check.Run(ctx, dir, target.Check)
+		checked, err := check.Run(ctx, worktreeDir, target.Check)
 		if err != nil {
 			return err
 		}
@@ -112,7 +152,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
 		if checked.Green {
-			verdict, err := classifyBranch(stdout, dir, target, unit)
+			verdict, err := classifyBranch(stdout, worktreeDir, base, target, unit)
 			if err != nil {
 				return err
 			}
@@ -148,17 +188,17 @@ func color(green bool) string {
 	return "red"
 }
 
-// classifyBranch prints the files and the count of lines dir's branch changed, then the verdict on them.
+// classifyBranch prints the files and the count of lines worktreeDir's branch changed, then the verdict on them.
 // It returns that verdict, or an error when git fails.
-func classifyBranch(stdout io.Writer, dir string, target config.Target, unit plan.Unit) (check.Verdict, error) {
-	changes, err := git.ChangedFiles(dir)
+func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Target, unit plan.Unit) (check.Verdict, error) {
+	changes, err := git.ChangedFiles(worktreeDir, base)
 	if err != nil {
 		return check.Verdict{}, err
 	}
 	for _, change := range changes {
 		fmt.Fprintf(stdout, "  %s %s\n", change.Status, change.Path)
 	}
-	addedLines, err := git.AddedLines(dir)
+	addedLines, err := git.AddedLines(worktreeDir, base)
 	if err != nil {
 		return check.Verdict{}, err
 	}
@@ -172,4 +212,103 @@ func classifyBranch(stdout io.Writer, dir string, target config.Target, unit pla
 		fmt.Fprintln(stdout, "  verdict: green")
 	}
 	return verdict, nil
+}
+
+// openDraftPR pushes section's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
+// then opens a draft PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
+// isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack. It returns an error when git, gh or the state file fails.
+func openDraftPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
+	saved, err := state.Load(statePath)
+	if err != nil {
+		return err
+	}
+	result := saved.Sections[section.Slug].Units[unitTitle].Result
+	isAccepted := result == "green" || result == "read-code"
+	if !isAccepted {
+		return nil
+	}
+	branch := section.Type + "/" + section.Slug
+	if err := git.Push(worktreeDir, branch); err != nil {
+		return err
+	}
+	changes, err := git.ChangedFiles(worktreeDir, base)
+	if err != nil {
+		return err
+	}
+	addedLines, err := git.AddedLines(worktreeDir, base)
+	if err != nil {
+		return err
+	}
+	input := bodyInput(section, saved.Sections[section.Slug], unitTitle)
+	input.Risks = pr.RiskLines(changes, addedLines)
+	var body string
+	if isEnglishWanted {
+		translate := func(korean string) (string, error) { return claude.Translate(ctx, korean) }
+		body, err = pr.BuildBilingualBody(input, translate)
+	} else {
+		body, err = pr.BuildBody(input)
+	}
+	if err != nil {
+		return err
+	}
+	if hasPR {
+		return pr.EditBody(worktreeDir, branch, body)
+	}
+	prURL, err := pr.CreateDraft(worktreeDir, base, section.Type+": "+section.Title, body)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "  draft PR: %s\n", prURL)
+	if previousURL != "" {
+		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
+			return err
+		}
+	}
+	return state.SavePRStatus(statePath, section.Slug, prURL, "OPEN")
+}
+
+// bodyInput collects the PR description's values: section's summary, every unit of section that ended green or read-code
+// in sectionState, in plan order, and the last check tail of lastUnitTitle.
+func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle string) pr.BodyInput {
+	input := pr.BodyInput{Summary: section.Summary, CheckTail: sectionState.Units[lastUnitTitle].CheckTail}
+	for _, unit := range section.Units {
+		record := sectionState.Units[unit.Title]
+		if record.Result != "green" && record.Result != "read-code" {
+			continue
+		}
+		bodyUnit := pr.BodyUnit{What: plan.LabelValue(unit.Body, "WHAT"), Done: plan.LabelValue(unit.Body, "DONE")}
+		if record.Result == "read-code" {
+			bodyUnit.ReadCodeReason = record.Reason
+		}
+		input.Units = append(input.Units, bodyUnit)
+	}
+	return input
+}
+
+// markReadyWhenFinished turns section's draft PR ready for review once every unit of section has ended green or
+// read-code in the state file at statePath, then labels it read-pr or read-code. It returns an error when the state file or gh fails.
+func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir string, section plan.Section) error {
+	saved, err := state.Load(statePath)
+	if err != nil {
+		return err
+	}
+	var unitResults []string
+	for _, unit := range section.Units {
+		result := saved.Sections[section.Slug].Units[unit.Title].Result
+		if result != "green" && result != "read-code" {
+			return nil
+		}
+		unitResults = append(unitResults, result)
+	}
+	branch := section.Type + "/" + section.Slug
+	if err := pr.MarkReady(worktreeDir, branch); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "  ready: %s\n", branch)
+	label := pr.ReadingLabel(unitResults)
+	if err := pr.AddLabel(worktreeDir, branch, label); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "  label: %s\n", label)
+	return nil
 }

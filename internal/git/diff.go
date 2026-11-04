@@ -8,11 +8,10 @@ type Change struct {
 	Path   string
 }
 
-// ChangedFiles lists the files dir's branch changed since it left main, a rename coming back as a D and an A.
+// ChangedFiles lists the files worktreeDir's branch changed since it left base, a rename coming back as a D and an A.
 // It returns an empty list when nothing changed, or an error when git fails.
-func ChangedFiles(dir string) ([]Change, error) {
-	// TODO: repos that branch from staging (blog-v2) need the branch the worktree left from, not main.
-	output, err := runGit(dir, "diff", "--name-status", "--no-renames", "main...HEAD")
+func ChangedFiles(worktreeDir, base string) ([]Change, error) {
+	output, err := runGit(worktreeDir, "diff", "--name-status", "--no-renames", base+"...HEAD")
 	if err != nil {
 		return nil, err
 	}
@@ -27,17 +26,28 @@ func ChangedFiles(dir string) ([]Change, error) {
 	return changes, nil
 }
 
-// AddedLines returns the text of every line dir's branch added since it left main, without the leading "+".
+// AddedLine is one line a branch added: the file it is in and its text without the leading "+".
+type AddedLine struct {
+	Path string
+	Text string
+}
+
+// AddedLines returns every line worktreeDir's branch added since it left base, each with the file it is in.
 // It returns an empty list when nothing was added, or an error when git fails.
-func AddedLines(dir string) ([]string, error) {
-	output, err := runGit(dir, "diff", "--unified=0", "main...HEAD")
+func AddedLines(worktreeDir, base string) ([]AddedLine, error) {
+	output, err := runGit(worktreeDir, "diff", "--unified=0", base+"...HEAD")
 	if err != nil {
 		return nil, err
 	}
-	var lines []string
+	var lines []AddedLine
+	path := ""
 	for line := range strings.SplitSeq(output, "\n") {
+		if filePath, isFileHeader := strings.CutPrefix(line, "+++ b/"); isFileHeader {
+			path = filePath
+			continue
+		}
 		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
-			lines = append(lines, line[1:])
+			lines = append(lines, AddedLine{Path: path, Text: line[1:]})
 		}
 	}
 	return lines, nil

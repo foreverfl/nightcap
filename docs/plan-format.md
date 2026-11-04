@@ -10,7 +10,8 @@ nightcap reads one markdown file per target. See `examples/plan.md` for a full o
 Notes can be listed and added over HTTP, so the web page has something to call.
 ```
 
-- The heading is `type: title (slug)`, at any level (`##`, `###`).
+- The heading is `## type: title (slug)`. A `###` heading is read the same way, but `##` is the convention.
+- A heading that starts with `👤` (`## 👤 feat: …`) is a PR a person does by hand. nightcap does not read it and never picks it.
 - `type` is one of `feat`, `fix`, `test`, `docs`, `refactor`, `chore`.
 - The branch is `type/slug` and the PR title is `type: title`.
 - The first plain line under the heading becomes the first sentence of the PR body.

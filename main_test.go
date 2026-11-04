@@ -2,35 +2,51 @@ package main
 
 import (
 	"bytes"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
 
-// oneTarget makes a temp folder holding a git repo, a one-unit plan and a nightcap.yml
-// pointing at both, moves into it, and returns the repo path.
-func oneTarget(t *testing.T) string {
+// setUpRepoWithOneUnitPlan makes a temp folder holding a git repo with a bare origin, a one-unit plan and a nightcap.yml
+// pointing at both, swaps in a fake gh with no PR, moves into it, and returns the repo path.
+func setUpRepoWithOneUnitPlan(t *testing.T) string {
 	t.Helper()
 	t.Chdir(t.TempDir())
 	repo, _ := filepath.Abs("repo")
+	origin, _ := filepath.Abs("origin.git")
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main", repo},
 		{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"},
+		{"init", "-q", "--bare", origin},
+		{"-C", repo, "remote", "add", "origin", origin},
 	} {
 		if output, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
-	planText := []byte("## feat: feed (feed)\n\n- [ ] add it\n  - DONE  go test passes\n")
+	planText := []byte(strings.Join([]string{
+		"## feat: feed (feed)",
+		"",
+		"- [ ] add it",
+		"  - DONE  go test passes",
+	}, "\n") + "\n")
 	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	yml := []byte("targets:\n  - plan: plan.md\n    repo: " + repo + "\n    check: true\n")
+	yml := []byte(strings.Join([]string{
+		"targets:",
+		"  - plan: plan.md",
+		"    repo: " + repo,
+		"    check: true",
+	}, "\n") + "\n")
 	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	useFakeGh(t, nil)
 	return repo
 }
 
@@ -45,22 +61,57 @@ func useFakeClaude(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 }
 
+// fakeGhPath is resolved before any test moves into its temp folder.
+var fakeGhPath, _ = filepath.Abs("testdata/fake-gh.sh")
+
+// useFakeGh points NIGHTCAP_GH at testdata/fake-gh.sh, which answers `gh pr view <branch>` with that branch's state
+// from prStates (OPEN, MERGED or CLOSED), or "no PR" for a branch not in it, and prints one PR URL for anything else.
+// It returns the path of the file where the fake writes every call's arguments, one call per line.
+func useFakeGh(t *testing.T, prStates map[string]string) string {
+	t.Helper()
+	var stateLines []string
+	for _, branch := range slices.Sorted(maps.Keys(prStates)) {
+		stateLines = append(stateLines, branch+" "+prStates[branch]+"\n")
+	}
+	statesPath := filepath.Join(t.TempDir(), "gh-states")
+	if err := os.WriteFile(statesPath, []byte(strings.Join(stateLines, "")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	callsPath := filepath.Join(t.TempDir(), "gh-calls")
+	t.Setenv("NIGHTCAP_GH", fakeGhPath)
+	t.Setenv("FAKE_GH_STATES", statesPath)
+	t.Setenv("FAKE_GH_CALLS", callsPath)
+	return callsPath
+}
+
 func TestDispatchRunPrintsPickedSection(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"run"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	want := "plan.md\n  branch: feat/feed\n  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed") + "\n  take  add it\n  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log") + ")\n  check: green\n  added lines: 0\n  verdict: green\n"
+	want := strings.Join([]string{
+		"plan.md",
+		"  branch: feat/feed",
+		"  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed"),
+		"  take  add it",
+		"  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log") + ")",
+		"  check: green",
+		"  added lines: 0",
+		"  verdict: green",
+		"  draft PR: https://github.com/foreverfl/feed/pull/1",
+		"  ready: feat/feed",
+		"  label: nightcap:read-pr",
+	}, "\n") + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
 
 func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	yml := []byte(strings.Join([]string{
 		"max_rounds: 2",
@@ -86,7 +137,7 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 }
 
 func TestRunMarksUnitBlockedWhenTheSameFailureRepeats(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	yml := []byte(strings.Join([]string{
 		"max_rounds: 3",
@@ -120,7 +171,7 @@ func TestDispatchUnknownCommandPrintsUsageAndExits2(t *testing.T) {
 }
 
 func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	fakeClaude := filepath.Join(t.TempDir(), "claude")
 	script := strings.Join([]string{
 		"#!/bin/sh",
@@ -157,7 +208,7 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 }
 
 func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
-	repo := oneTarget(t)
+	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	yml := []byte(strings.Join([]string{
 		"max_rounds: 2",
@@ -182,5 +233,56 @@ func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
 	}, "\n") + "\n"
 	if secondStdout.String() != want {
 		t.Fatalf("second run stdout = %q, want %q", secondStdout.String(), want)
+	}
+}
+
+func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
+	setUpRepoWithOneUnitPlan(t)
+	useFakeGh(t, map[string]string{"feat/feed": "MERGED"})
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	want := strings.Join([]string{
+		"skip feed: PR merged",
+		"plan.md: nothing to take",
+	}, "\n") + "\n"
+	if stdout.String() != want {
+		t.Fatalf("a heading whose PR was merged should be skipped, got %q", stdout.String())
+	}
+}
+
+func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
+	repo := setUpRepoWithOneUnitPlan(t)
+	useFakeClaude(t)
+	planText := []byte(strings.Join([]string{
+		"## feat: feed (feed)",
+		"",
+		"- [ ] add it",
+		"  - DONE  go test passes",
+		"",
+		"## feat: feed page (feed-page)",
+		"",
+		"- [ ] show it",
+		"  - DONE  go test passes",
+	}, "\n") + "\n")
+	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", repo, "branch", "feat/feed").CombinedOutput(); err != nil {
+		t.Fatalf("git branch: %v\n%s", err, output)
+	}
+	ghCallsPath := useFakeGh(t, map[string]string{"feat/feed": "OPEN"})
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run", "--section", "feed-page"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	ghCalls, err := os.ReadFile(ghCallsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	createIndex := strings.Index(string(ghCalls), "pr create ")
+	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --draft --base feat/feed ") {
+		t.Fatalf("the PR should be opened onto feat/feed, got gh calls:\n%s", ghCalls)
 	}
 }

@@ -58,7 +58,7 @@ const migrationPathWord = "migration"
 // Classify returns a red Verdict when a change touches a dependency file, modifies or deletes an existing
 // contract file (adding a new one is allowed), or an added line carries a skip marker; past those, a ReadCode
 // one when a change matches readCode, adds a migration or sits outside wherePaths. Otherwise an empty Verdict.
-func Classify(changes []git.Change, addedLines, wherePaths, readCode []string) Verdict {
+func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, readCode []string) Verdict {
 	for _, change := range changes {
 		if matchesAny(change.Path, dependencyFiles) {
 			return Verdict{Red: true, Reason: "changed a dependency file: " + change.Path}
@@ -68,8 +68,8 @@ func Classify(changes []git.Change, addedLines, wherePaths, readCode []string) V
 		}
 	}
 	for _, line := range addedLines {
-		if hasSkipMarker(line) {
-			return Verdict{Red: true, Reason: "added a skip marker: " + strings.TrimSpace(line)}
+		if hasSkipMarker(line.Text) {
+			return Verdict{Red: true, Reason: "added a skip marker in " + line.Path + ": " + strings.TrimSpace(line.Text)}
 		}
 	}
 	for _, change := range changes {

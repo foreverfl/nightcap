@@ -7,21 +7,21 @@ import (
 )
 
 // AddWorktree checks out branch in <repo>/.nightcap/worktrees/<slug> and returns that folder.
-// An existing folder is reused as is; an existing branch is checked out instead of created.
+// A new branch starts from base; an existing folder is reused as is and an existing branch is checked out as it is.
 // It returns an error when git fails.
-func AddWorktree(repo, branch, slug string) (string, error) {
-	dir := filepath.Join(repo, ".nightcap", "worktrees", slug)
-	if _, err := os.Stat(dir); err == nil {
-		return dir, nil
+func AddWorktree(repo, base, branch, slug string) (string, error) {
+	worktreeDir := filepath.Join(repo, ".nightcap", "worktrees", slug)
+	if _, err := os.Stat(worktreeDir); err == nil {
+		return worktreeDir, nil
 	}
-	args := []string{"worktree", "add", dir, branch}
+	args := []string{"worktree", "add", worktreeDir, branch}
 	if !branchExists(repo, branch) {
-		args = []string{"worktree", "add", dir, "-b", branch}
+		args = []string{"worktree", "add", "-b", branch, worktreeDir, base}
 	}
 	if _, err := runGit(repo, args...); err != nil {
 		return "", err
 	}
-	return dir, nil
+	return worktreeDir, nil
 }
 
 // ListWorktrees returns one line per worktree of repo, as `git worktree list` prints them.

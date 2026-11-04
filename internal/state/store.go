@@ -77,3 +77,16 @@ func IsBlocked(section Section) bool {
 	}
 	return false
 }
+
+// SavePRStatus notes the PR URL and state gh reported for the heading sectionSlug, keeping the rest of the state file at path.
+// It returns an error when reading or writing fails.
+func SavePRStatus(path, sectionSlug, prURL, prState string) error {
+	current, err := Load(path)
+	if err != nil {
+		return err
+	}
+	section := current.Sections[sectionSlug]
+	section.PRURL, section.PRState = prURL, prState
+	current.Sections[sectionSlug] = section
+	return Save(path, current)
+}

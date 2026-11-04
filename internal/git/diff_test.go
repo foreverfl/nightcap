@@ -24,12 +24,12 @@ func commitFile(t *testing.T, dir, name, content string) {
 }
 
 func TestChangedFilesListsOneAddedFile(t *testing.T) {
-	dir, err := AddWorktree(oneRepo(t), "feat/feed", "feed")
+	dir, err := AddWorktree(oneRepo(t), "main", "feat/feed", "feed")
 	if err != nil {
 		t.Fatal(err)
 	}
 	commitFile(t, dir, "feed.go", "package feed\n")
-	changes, err := ChangedFiles(dir)
+	changes, err := ChangedFiles(dir, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,16 +39,16 @@ func TestChangedFilesListsOneAddedFile(t *testing.T) {
 }
 
 func TestAddedLinesReturnsTheOneAddedLine(t *testing.T) {
-	dir, err := AddWorktree(oneRepo(t), "feat/feed", "feed")
+	dir, err := AddWorktree(oneRepo(t), "main", "feat/feed", "feed")
 	if err != nil {
 		t.Fatal(err)
 	}
 	commitFile(t, dir, "feed.go", "package feed\n")
-	lines, err := AddedLines(dir)
+	lines, err := AddedLines(dir, "main")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 1 || lines[0] != "package feed" {
-		t.Fatalf("a commit adding one line should come back as [package feed], got %q", lines)
+	if len(lines) != 1 || lines[0] != (AddedLine{Path: "feed.go", Text: "package feed"}) {
+		t.Fatalf("a commit adding one line to feed.go should come back as [{feed.go package feed}], got %+v", lines)
 	}
 }
