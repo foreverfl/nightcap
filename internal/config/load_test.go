@@ -27,7 +27,7 @@ func TestLoadFillsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Config{MaxTurns: 30, MaxRounds: 3, WorkStart: "09:00", AllowedTools: defaultAllowedTools,
+	want := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools,
 		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check", Lang: []string{"ko"}}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -74,5 +74,15 @@ func TestLoadReadsLang(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.Targets[0].Lang, []string{"en", "ko"}) {
 		t.Fatalf("Lang = %v, want [en ko]", got.Targets[0].Lang)
+	}
+}
+
+func TestLoadReadsWorkStart(t *testing.T) {
+	got, err := loadFrom(t, "work_start: \"12:00\"\n"+oneConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.WorkStart != "12:00" {
+		t.Fatalf("WorkStart = %q, want 12:00", got.WorkStart)
 	}
 }

@@ -13,7 +13,7 @@ Plan files follow [docs/plan-format.md](docs/plan-format.md); copy [examples/pla
 Write `nightcap.yml` next to the binary (it is gitignored) and run `nightcap run` from that folder. One target per plan file:
 
 ```yaml
-work_start: "09:00"        # no new usage window opens within 5h of this
+work_start: "09:00"        # leave empty for no before-work limit; when set, no new usage window opens within 5h of it
 max_turns: 30
 max_rounds: 3
 targets:
