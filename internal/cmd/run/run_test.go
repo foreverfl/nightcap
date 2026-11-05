@@ -58,13 +58,13 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
-	// the fake answers /usage with a session resetting in 2099, hits the limit on its first round and finishes on the second
+	// the fake answers /usage with session 100% resetting in 2099 and weekly_all 62%, hits the limit on its first round and finishes on the second
 	rounds := filepath.Join(t.TempDir(), "rounds")
 	fakeClaude := filepath.Join(t.TempDir(), "claude")
 	script := strings.Join([]string{
 		"#!/bin/sh",
 		`if [ "$2" = "/usage" ]; then`,
-		`  echo '{"usage_report":{"rate_limits":{"limits":[{"kind":"session","percent":100,"resets_at":"2099-01-01T04:30:00+09:00"}]}}}'`,
+		`  echo '{"usage_report":{"rate_limits":{"limits":[{"kind":"session","percent":100,"resets_at":"2099-01-01T04:30:00+09:00"},{"kind":"weekly_all","percent":62}]}}}'`,
 		"  exit 0",
 		"fi",
 		"echo x >> " + rounds,
@@ -95,5 +95,8 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 	reset := time.Date(2099, 1, 1, 4, 30, 0, 0, time.FixedZone("JST", 9*60*60))
 	if got.Attempts != 2 || got.Result != "green" || !sleptUntil.Equal(reset) {
 		t.Fatalf("got %+v, slept until %v; want 2 rounds, green, slept until %v", got, sleptUntil, reset)
+	}
+	if got.UsageAtLimit == nil || *got.UsageAtLimit != (state.UsageAtLimit{Session: 100, WeeklyAll: 62}) {
+		t.Fatalf("usage_at_limit = %+v, want session 100 and weekly_all 62", got.UsageAtLimit)
 	}
 }
