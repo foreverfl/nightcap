@@ -20,7 +20,7 @@ var defaultAllowedTools = []string{
 }
 
 // Load reads <dir>/nightcap.yml, fills missing keys with defaults
-// (max_turns 30, max_rounds 3, work_start 09:00, lang [ko] per target) and expands a leading "~/" in plan and repo.
+// (max_turns 30, max_rounds 3, lang [ko] per target; an empty work_start turns the before-work limit off) and expands a leading "~/" in plan and repo.
 // It returns an error when the file is unreadable or malformed, targets is empty,
 // or a target lacks plan, repo or check.
 func Load(dir string) (Config, error) {
@@ -28,7 +28,7 @@ func Load(dir string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	config := Config{MaxTurns: 30, MaxRounds: 3, WorkStart: "09:00", AllowedTools: defaultAllowedTools}
+	config := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools}
 	if err := yaml.Unmarshal(raw, &config); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", FileName, err)
 	}

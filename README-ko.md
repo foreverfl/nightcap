@@ -13,7 +13,9 @@
 바이너리 옆에 `nightcap.yml`을 쓰고(gitignore 대상) 그 폴더에서 `nightcap run`을 친다. 계획 문서 하나가 항목 하나:
 
 ```yaml
-work_start: "09:00"        # 이 시각 5시간 전부터는 새 사용량 창을 열지 않는다
+work_start: "09:00"        # 비우면 출근 전 제한 없음. 적으면 이 시각 5시간 전부터 새 창을 열지 않는다
+limit_session: 80          # 5시간 창 %가 이 위면 새 유닛을 안 연다
+limit_weekly_all: 80       # 주간 %가 이 위면 새 유닛을 안 연다. 리셋 24시간 안이면 무시
 max_turns: 30
 max_rounds: 3
 targets:
