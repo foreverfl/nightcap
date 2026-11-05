@@ -18,7 +18,7 @@ type Section struct {
 // Unit is how one unit ended after its last round.
 type Unit struct {
 	Attempts  int       `json:"attempts"`
-	Result    string    `json:"result"` // green, read-code, red, blocked or interrupted
+	Result    string    `json:"result"` // green, read-code, red, blocked, interrupted, or stopped (usage limit before the unit opened)
 	Reason    string    `json:"reason"`
 	CheckTail string    `json:"check_tail"`
 	UpdatedAt time.Time `json:"updated_at"`
