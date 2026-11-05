@@ -33,7 +33,6 @@ func ParseResult(raw []byte) (Result, error) {
 		return Result{}, fmt.Errorf("claude output is not a result JSON: %.200s", raw)
 	}
 	result := Result{Outcome: Done, Text: output.Result}
-	// TODO(first night run): read the reset time out of the real limit message once it is captured.
 	if output.APIErrorStatus != nil && *output.APIErrorStatus == 429 {
 		result.Outcome = RateLimited
 	} else if strings.HasPrefix(output.Result, "blocked: needs") {

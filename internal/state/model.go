@@ -17,9 +17,16 @@ type Section struct {
 
 // Unit is how one unit ended after its last round.
 type Unit struct {
-	Attempts  int       `json:"attempts"`
-	Result    string    `json:"result"` // green, read-code, red, blocked or interrupted
-	Reason    string    `json:"reason"`
-	CheckTail string    `json:"check_tail"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Attempts     int           `json:"attempts"`
+	Result       string        `json:"result"` // green, read-code, red, blocked, interrupted, or stopped (by a usage limit)
+	Reason       string        `json:"reason"`
+	CheckTail    string        `json:"check_tail"`
+	UsageAtLimit *UsageAtLimit `json:"usage_at_limit,omitempty"` // set when claude hit a rate limit during this unit
+	UpdatedAt    time.Time     `json:"updated_at"`
+}
+
+// UsageAtLimit is the /usage percents read right after claude hit a rate limit, to tell in the morning which limit it was.
+type UsageAtLimit struct {
+	Session   int `json:"session"`
+	WeeklyAll int `json:"weekly_all"`
 }

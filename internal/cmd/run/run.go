@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"nightcap/internal/check"
 	"nightcap/internal/client/claude"
@@ -18,6 +19,7 @@ import (
 	"nightcap/internal/plan"
 	"nightcap/internal/pr"
 	"nightcap/internal/state"
+	"nightcap/internal/usage"
 )
 
 // Run is the "run" subcommand; args is everything after "run", where --section names one heading.
@@ -109,6 +111,13 @@ func Run(args []string, stdout io.Writer) error {
 			if !unit.HasCheck {
 				continue
 			}
+			// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
+			usageJSON, _ := claude.Usage(ctx)
+			current, _ := usage.Read(usageJSON)
+			if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
+				fmt.Fprintf(stdout, "  stop: %s\n", reason)
+				return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
+			}
 			if err := runUnit(ctx, stdout, loaded, target, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
@@ -139,6 +148,23 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 			return err
 		}
 		fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", unit.Title, result.Outcome, logPath)
+		if result.Outcome == claude.RateLimited {
+			usageJSON, _ := claude.Usage(ctx)
+			current, _ := usage.Read(usageJSON)
+			if current.Known {
+				record.UsageAtLimit = &state.UsageAtLimit{Session: current.Session.Percent, WeeklyAll: current.WeeklyAll.Percent}
+			}
+			reset, afterWork := windowReset(time.Now(), current, loaded.WorkStart)
+			// the reset comes after work_start, so sleeping would carry the run into the workday
+			if afterWork != "" {
+				fmt.Fprintf(stdout, "  stop: rate limited, %s\n", afterWork)
+				record.Result, record.Reason = "stopped", "rate limited, "+afterWork
+				return state.SaveUnit(statePath, slug, unit.Title, record)
+			}
+			fmt.Fprintf(stdout, "  sleep until %s\n", reset.Local().Format("15:04"))
+			sleepUntil(ctx, reset)
+			continue
+		}
 		if result.Outcome != claude.Done {
 			break
 		}
@@ -178,6 +204,45 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 	fmt.Fprintln(stdout, "  blocked")
 	record.Result = "blocked"
 	return state.SaveUnit(statePath, slug, unit.Title, record)
+}
+
+// usageStopReason says why no unit should open at now under loaded's limits, or "" when one may.
+// The weekly limit is skipped within 24h of its reset, and a window not open yet is taken to reset at now + 5h.
+func usageStopReason(now time.Time, current usage.Usage, loaded config.Config) string {
+	// stop 1: the 5h window is already at limit_session, so this unit could hit the limit halfway
+	if current.Known && loaded.LimitSession > 0 && current.Session.Percent >= loaded.LimitSession {
+		return fmt.Sprintf("session %d%% ≥ %d", current.Session.Percent, loaded.LimitSession)
+	}
+	// stop 2: the week is at limit_weekly_all and its reset is over 24h away, so tonight would eat the weekdays' share
+	weeklyResetsSoon := current.WeeklyAll.ResetsAt.Sub(now) < 24*time.Hour
+	if current.Known && loaded.LimitWeeklyAll > 0 && !weeklyResetsSoon && current.WeeklyAll.Percent >= loaded.LimitWeeklyAll {
+		return fmt.Sprintf("weekly_all %d%% ≥ %d", current.WeeklyAll.Percent, loaded.LimitWeeklyAll)
+	}
+	// stop 3: the window would still be running at work_start, so the morning would start rate-limited
+	_, afterWork := windowReset(now, current, loaded.WorkStart)
+	return afterWork
+}
+
+// windowReset returns when the 5h window resets (the time /usage reported, or now + 5h when no window is open or /usage failed),
+// and afterWork "reset 10:00 > work_start 09:00" when that is after work_start, or "".
+func windowReset(now time.Time, current usage.Usage, workStartHHMM string) (reset time.Time, afterWork string) {
+	reset = now.Add(5 * time.Hour)
+	if current.Session.ResetsAt.After(now) {
+		reset = current.Session.ResetsAt
+	}
+	workStart, _ := usage.NextWorkStart(now, workStartHHMM)
+	if usage.EndsBeforeWork(reset, workStart) {
+		return reset, ""
+	}
+	return reset, fmt.Sprintf("reset %s > work_start %s", reset.In(now.Location()).Format("15:04"), workStart.Format("15:04"))
+}
+
+// sleepUntil waits until wakeAt or until ctx is cancelled; tests swap it out so they do not wait.
+var sleepUntil = func(ctx context.Context, wakeAt time.Time) {
+	select {
+	case <-time.After(time.Until(wakeAt)):
+	case <-ctx.Done():
+	}
 }
 
 // color names a check result the way the plan file does: "green" for pass, "red" for fail.
