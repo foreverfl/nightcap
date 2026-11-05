@@ -100,3 +100,12 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 		t.Fatalf("usage_at_limit = %+v, want session 100 and weekly_all 62", got.UsageAtLimit)
 	}
 }
+
+func TestBuildPromptLeavesTheRulesOutOfAResumedSession(t *testing.T) {
+	if !strings.Contains(BuildPrompt("add it", "", false), unitRules) {
+		t.Fatal("a new session should get the unit rules")
+	}
+	if strings.Contains(BuildPrompt("add it", "FAIL", true), unitRules) {
+		t.Fatal("a resumed session already has the unit rules")
+	}
+}

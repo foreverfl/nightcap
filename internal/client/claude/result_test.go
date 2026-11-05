@@ -49,3 +49,11 @@ func TestParseResultRejectsPlainText(t *testing.T) {
 		t.Fatal("expected error for non-JSON output")
 	}
 }
+
+func TestParseResultKeepsTheSessionID(t *testing.T) {
+	output := oneResult()
+	output["session_id"] = "b2dcfa87-8868-4dda-9a16-71f70611bc18"
+	if got := parse(t, output).SessionID; got != "b2dcfa87-8868-4dda-9a16-71f70611bc18" {
+		t.Fatalf("SessionID = %q, want the session_id from the output", got)
+	}
+}

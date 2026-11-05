@@ -139,13 +139,17 @@ func Run(args []string, stdout io.Writer) error {
 // It returns an error only when claude, sh, git or the state file fails.
 func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, worktreeDir, base, slug string, number int, unit plan.Unit, statePath string) error {
 	failureTail := ""
+	sessionID := ""
 	record := state.Unit{}
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
 		logPath := filepath.Join(target.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
-		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(unit.Body, failureTail), loaded.MaxTurns, loaded.AllowedTools, logPath)
+		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(unit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
 			return err
+		}
+		if result.SessionID != "" {
+			sessionID = result.SessionID
 		}
 		fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", unit.Title, result.Outcome, logPath)
 		if result.Outcome == claude.RateLimited {

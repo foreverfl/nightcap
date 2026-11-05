@@ -335,3 +335,27 @@ func TestLintWherePathWithASpaceExits1(t *testing.T) {
 		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
 	}
 }
+
+func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
+	repo := setUpRepoWithOneUnitPlan(t)
+	// the fake prints its arguments to stderr, which lands in the round log, and answers with one session_id
+	fakeClaude := filepath.Join(t.TempDir(), "claude")
+	script := "#!/bin/sh\necho \"$@\" >&2\necho '{\"type\":\"result\",\"result\":\"ok\",\"session_id\":\"s1\"}'\n"
+	if err := os.WriteFile(fakeClaude, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
+	yml := []byte("max_rounds: 2\ntargets:\n  - plan: plan.md\n    repo: " + repo + "\n    check: echo $$; false\n")
+	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	first, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log"))
+	second, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/unit1-round2.log"))
+	if strings.Contains(string(first), "--resume") || !strings.Contains(string(second), "--resume s1") {
+		t.Fatalf("round 1 should start a session and round 2 resume s1\nround 1: %s\nround 2: %s", first, second)
+	}
+}
