@@ -3,7 +3,6 @@ package run
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -24,20 +23,15 @@ import (
 	"nightcap/internal/usage"
 )
 
-// Run is the "run" subcommand; args is everything after "run": the plan file, with --section naming one heading.
-// For now it picks tonight's heading of that plan per target, checks its branch out in a worktree and runs
+// Run is the "run" subcommand; args is everything after "run", and its first item is the plan file.
+// For now it picks the plan's top heading that has a unit to take per target, checks its branch out in a worktree and runs
 // the first unit that has a check through runUnit; it returns an error when no plan file is named,
 // or when the config, the plan file, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("run", flag.ContinueOnError)
-	sectionName := flags.String("section", "", "heading title or slug to take")
-	if err := flags.Parse(args); err != nil {
-		return err
-	}
-	planPath := flags.Arg(0)
-	if planPath == "" {
+	if len(args) == 0 {
 		return errors.New("run: name a plan file")
 	}
+	planPath := args[0]
 	loaded, err := config.Load(".")
 	if err != nil {
 		return err
@@ -96,7 +90,7 @@ func Run(args []string, stdout io.Writer) error {
 			}
 			notBlocked = append(notBlocked, section)
 		}
-		section, ok := plan.Pick(notBlocked, *sectionName)
+		section, ok := plan.Pick(notBlocked)
 		if !ok {
 			fmt.Fprintf(stdout, "%s: nothing to take\n", target.Plan)
 			continue

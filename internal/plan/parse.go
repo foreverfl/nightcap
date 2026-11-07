@@ -78,17 +78,10 @@ func Parse(text string) []Section {
 	return sections
 }
 
-// Pick returns the section whose Title or Slug equals name, or with an empty name
-// the first section that has a unit a night run can take, never one marked 👤 or not marked at all; ok is false when none matches.
-func Pick(sections []Section, name string) (Section, bool) {
+// Pick returns the first section that has a unit a night run can take, never one marked 👤 or not marked at all; ok is false when none matches.
+func Pick(sections []Section) (Section, bool) {
 	for _, section := range sections {
 		if section.IsPerson() || section.Mark == MarkNone {
-			continue
-		}
-		if name != "" {
-			if section.Title == name || section.Slug == name {
-				return section, true
-			}
 			continue
 		}
 		for _, unit := range section.Units {

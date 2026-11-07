@@ -241,7 +241,6 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 		"## 📄 feat: feed (feed)",
 		"",
 		"- [ ] add it",
-		"  - DONE  go test passes",
 		"",
 		"## 📄 feat: feed page (feed-page)",
 		"",
@@ -256,7 +255,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	}
 	ghCallsPath := useFakeGh(t, map[string]string{"feat/feed": "OPEN"})
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run", "--section", "feed-page", "commit-bot.md"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	ghCalls, err := os.ReadFile(ghCallsPath)
