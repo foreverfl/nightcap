@@ -7,6 +7,9 @@ import (
 
 var sectionTypes = []string{"feat", "fix", "test", "docs", "refactor", "chore"}
 
+// marks maps each reading mark written before a heading's type to its Mark.
+var marks = map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👀": MarkReadCode, "👤": MarkPerson}
+
 var checkNames = []string{"hurl", "go test", "make check", "cargo test", "npm test"}
 
 // Parse returns every "type: title (slug)" heading in a plan file with its open units, in file order.
@@ -76,10 +79,10 @@ func Parse(text string) []Section {
 }
 
 // Pick returns the section whose Title or Slug equals name, or with an empty name
-// the first section that has a unit a night run can take, never one marked 👤; ok is false when none matches.
+// the first section that has a unit a night run can take, never one marked 👤 or not marked at all; ok is false when none matches.
 func Pick(sections []Section, name string) (Section, bool) {
 	for _, section := range sections {
-		if section.IsPerson {
+		if section.IsPerson() || section.Mark == MarkNone {
 			continue
 		}
 		if name != "" {
@@ -97,10 +100,14 @@ func Pick(sections []Section, name string) (Section, bool) {
 	return Section{}, false
 }
 
-// parseHeading splits "## feat: title (slug)", or "## 👤 feat: title (slug)" with IsPerson, into a Section; ok is false for any other heading.
+// parseHeading splits "## 📄 feat: title (slug)" into a Section with its Mark; a heading without a mark parses with MarkNone.
+// ok is false for a heading without a known type or a slug.
 func parseHeading(line string) (Section, bool) {
 	text := strings.TrimSpace(strings.TrimLeft(line, "#"))
-	text, isPerson := strings.CutPrefix(text, "👤 ")
+	mark := MarkNone
+	if symbol, rest, found := strings.Cut(text, " "); found && marks[symbol] != MarkNone {
+		mark, text = marks[symbol], rest
+	}
 	sectionType, rest, found := strings.Cut(text, ": ")
 	if !found || !isSectionType(sectionType) || !strings.HasSuffix(rest, ")") {
 		return Section{}, false
@@ -110,10 +117,10 @@ func parseHeading(line string) (Section, bool) {
 		return Section{}, false
 	}
 	return Section{
-		Type:     sectionType,
-		Title:    rest[:open],
-		Slug:     rest[open+2 : len(rest)-1],
-		IsPerson: isPerson,
+		Mark:  mark,
+		Type:  sectionType,
+		Title: rest[:open],
+		Slug:  rest[open+2 : len(rest)-1],
 	}, true
 }
 

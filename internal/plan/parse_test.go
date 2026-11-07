@@ -8,7 +8,7 @@ import (
 
 // oneSection is the smallest plan that yields one section with one open unit.
 func oneSection() string {
-	return "## feat: 홈 화면 피드 (home-feed)\n" +
+	return "## 📄 feat: 홈 화면 피드 (home-feed)\n" +
 		"\n" +
 		"Show the feed on the home screen.\n" +
 		"\n" +
@@ -107,9 +107,9 @@ func TestParseReadsExamplePlans(t *testing.T) {
 }
 
 func TestPickNeverTakesAPersonHeading(t *testing.T) {
-	person := strings.Replace(oneSection(), "## feat:", "## 👤 feat:", 1)
+	person := strings.Replace(oneSection(), "## 📄 feat:", "## 👤 feat:", 1)
 	sections := Parse(person)
-	if len(sections) != 1 || !sections[0].IsPerson || sections[0].Type != "feat" {
+	if len(sections) != 1 || !sections[0].IsPerson() || sections[0].Type != "feat" {
 		t.Fatalf("a 👤 heading should parse as a person section of type feat, got %+v", sections)
 	}
 	if _, ok := Pick(sections, ""); ok {
@@ -117,5 +117,25 @@ func TestPickNeverTakesAPersonHeading(t *testing.T) {
 	}
 	if _, ok := Pick(sections, "home-feed"); ok {
 		t.Fatal("Pick should not take a 👤 heading even by name")
+	}
+}
+
+func TestParseReadsEachReadingMark(t *testing.T) {
+	want := map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👀": MarkReadCode, "👤": MarkPerson}
+	for symbol, mark := range want {
+		section := Parse(strings.Replace(oneSection(), "📄", symbol, 1))[0]
+		if section.Mark != mark || section.Type != "feat" {
+			t.Fatalf("%s: got mark %q type %q, want %q feat", symbol, section.Mark, section.Type, mark)
+		}
+	}
+}
+
+func TestPickSkipsAHeadingWithoutAMark(t *testing.T) {
+	sections := Parse(strings.Replace(oneSection(), "📄 ", "", 1))
+	if len(sections) != 1 || sections[0].Mark != MarkNone {
+		t.Fatalf("an unmarked heading should still parse with MarkNone, got %+v", sections)
+	}
+	if _, ok := Pick(sections, ""); ok {
+		t.Fatal("Pick should not take an unmarked heading")
 	}
 }
