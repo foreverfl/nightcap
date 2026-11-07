@@ -360,7 +360,7 @@ func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle s
 	return input
 }
 
-// markReadyWhenFinished marks the PR ready when every unit is done, then adds the label the heading's mark names.
+// markReadyWhenFinished marks the PR ready when every unit is done, adds the label the heading's mark names, and turns on auto-merge for 🤖.
 func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir string, section plan.Section) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
@@ -382,5 +382,11 @@ func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir string, sect
 		return err
 	}
 	fmt.Fprintf(stdout, "  label: %s\n", label)
+	if section.Mark == plan.MarkAuto {
+		if err := pr.EnableAutoMerge(worktreeDir, branch); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "  auto-merge: %s\n", branch)
+	}
 	return nil
 }
