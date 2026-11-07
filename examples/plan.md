@@ -1,3 +1,10 @@
+---
+repo: ~/workspace/apps-web/notes
+test: make check
+protected: ["*.hurl", "*_test.go", "Makefile"]
+dependencies: [go.mod, go.sum]
+---
+
 # notes app — commits
 
 ## 📄 feat: list and add notes (notes-api)

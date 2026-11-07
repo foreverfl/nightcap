@@ -31,3 +31,11 @@ type Unit struct {
 	Body     string // the checkbox line plus its indented lines, fences included
 	HasCheck bool   // the DONE line names a check, so a night run may take it
 }
+
+// Meta is the plan file's frontmatter: which repo the plan runs in and how its units are tested.
+type Meta struct {
+	Repo         string   `yaml:"repo"`         // a leading "~/" is expanded to the home folder
+	Test         string   `yaml:"test"`         // shell command that proves a unit, such as make check
+	Protected    []string `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
+	Dependencies []string `yaml:"dependencies"` // dependency file globs the agent may not touch
+}

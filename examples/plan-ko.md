@@ -1,3 +1,10 @@
+---
+repo: ~/workspace/apps-web/notes
+test: make check
+protected: ["*.hurl", "*_test.go", "Makefile"]
+dependencies: [go.mod, go.sum]
+---
+
 # 메모 앱 — 커밋 단위
 
 ## 📄 feat: 메모 목록과 추가 (notes-api)

@@ -28,26 +28,39 @@ func setUpRepoWithOneUnitPlan(t *testing.T) string {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
-	planText := []byte(strings.Join([]string{
+	writePlanAndConfig(t, repo, "true", "")
+	useFakeGh(t, nil)
+	return repo
+}
+
+// writePlan writes commit-bot.md: a frontmatter naming repo, the test command and the protected and dependency files, then one heading with one unit.
+func writePlan(t *testing.T, repo, test string) {
+	t.Helper()
+	planText := strings.Join([]string{
+		"---",
+		"repo: " + repo,
+		"test: " + test,
+		`protected: ["*_test.go"]`,
+		"dependencies: [go.mod, go.sum]",
+		"---",
+		"",
 		"## 📄 feat: feed (feed)",
 		"",
 		"- [ ] add it",
 		"  - DONE  go test passes",
-	}, "\n") + "\n")
-	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
+	}, "\n") + "\n"
+	if err := os.WriteFile("commit-bot.md", []byte(planText), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	yml := []byte(strings.Join([]string{
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: true",
-	}, "\n") + "\n")
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
+}
+
+// writePlanAndConfig writes commit-bot.md through writePlan, then nightcap.yml with configYAML as its whole text.
+func writePlanAndConfig(t *testing.T, repo, test, configYAML string) {
+	t.Helper()
+	writePlan(t, repo, test)
+	if err := os.WriteFile("nightcap.yml", []byte(configYAML), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	useFakeGh(t, nil)
-	return repo
 }
 
 // useFakeClaude points NIGHTCAP_CLAUDE at a script that answers every round with a Done result JSON.
@@ -88,12 +101,12 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	var stdout, stderr bytes.Buffer
-	code := dispatch([]string{"run"}, &stdout, &stderr)
+	code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	want := strings.Join([]string{
-		"plan.md",
+		"commit-bot.md",
 		"  branch: feat/feed",
 		"  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed"),
 		"  take  add it",
@@ -112,18 +125,9 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
-	yml := []byte(strings.Join([]string{
-		"max_rounds: 2",
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: echo $$; false",
-	}, "\n"))
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
@@ -138,18 +142,9 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 func TestRunMarksUnitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
-	yml := []byte(strings.Join([]string{
-		"max_rounds: 3",
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: false",
-	}, "\n"))
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "false", "max_rounds: 3\n")
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
@@ -183,18 +178,9 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
-	yml := []byte(strings.Join([]string{
-		"max_rounds: 3",
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: true",
-	}, "\n"))
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "true", "max_rounds: 3\n")
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
@@ -209,26 +195,17 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
-	yml := []byte(strings.Join([]string{
-		"max_rounds: 2",
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: false",
-	}, "\n"))
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "false", "max_rounds: 2\n")
 	var firstStdout, secondStdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &firstStdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &firstStdout, &stderr); code != 0 {
 		t.Fatalf("first run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	if code := dispatch([]string{"run"}, &secondStdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &secondStdout, &stderr); code != 0 {
 		t.Fatalf("second run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	want := strings.Join([]string{
 		"skip feed: blocked",
-		"plan.md: nothing to take",
+		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if secondStdout.String() != want {
 		t.Fatalf("second run stdout = %q, want %q", secondStdout.String(), want)
@@ -239,15 +216,57 @@ func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
 	setUpRepoWithOneUnitPlan(t)
 	useFakeGh(t, map[string]string{"feat/feed": "MERGED"})
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	want := strings.Join([]string{
 		"skip feed: PR merged",
-		"plan.md: nothing to take",
+		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if stdout.String() != want {
 		t.Fatalf("a heading whose PR was merged should be skipped, got %q", stdout.String())
+	}
+}
+
+func TestRunWithoutAPlanFileFails(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "run: name a plan file") {
+		t.Fatalf("want exit 1 and run: name a plan file, got %d %q", code, stderr.String())
+	}
+}
+
+func TestStatusPrintsTheFrontmatterRepo(t *testing.T) {
+	repo := setUpRepoWithOneUnitPlan(t)
+	var stdout, stderr bytes.Buffer
+	// each worktree line is git worktree list's own "<path>  <commit> [main]"
+	if code := dispatch([]string{"status", "commit-bot.md"}, &stdout, &stderr); code != 0 || !strings.HasPrefix(stdout.String(), repo+"\n") || !strings.Contains(stdout.String(), "[main]") {
+		t.Fatalf("want the repo line, then its main worktree; got %d %q %q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestStatusWithoutAPlanFileFails(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"status"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "status: name a plan file") {
+		t.Fatalf("want exit 1 and status: name a plan file, got %d %q", code, stderr.String())
+	}
+}
+
+func TestRunWithoutProtectedInTheFrontmatterFails(t *testing.T) {
+	t.Chdir(t.TempDir())
+	planText := strings.Join([]string{
+		"---",
+		"repo: /tmp/repo",
+		"test: true",
+		"dependencies: []",
+		"---",
+	}, "\n") + "\n"
+	if err := os.WriteFile("commit-bot.md", []byte(planText), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	want := "run: the plan's frontmatter needs repo, test, protected and dependencies"
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), want) {
+		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stderr.String())
 	}
 }
 
@@ -255,17 +274,23 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	planText := []byte(strings.Join([]string{
+		"---",
+		"repo: " + repo,
+		"test: true",
+		"protected: []",
+		"dependencies: []",
+		"---",
+		"",
 		"## 📄 feat: feed (feed)",
 		"",
 		"- [ ] add it",
-		"  - DONE  go test passes",
 		"",
 		"## 📄 feat: feed page (feed-page)",
 		"",
 		"- [ ] show it",
 		"  - DONE  go test passes",
 	}, "\n") + "\n")
-	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
+	if err := os.WriteFile("commit-bot.md", planText, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if output, err := exec.Command("git", "-C", repo, "branch", "feat/feed").CombinedOutput(); err != nil {
@@ -273,7 +298,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	}
 	ghCallsPath := useFakeGh(t, map[string]string{"feat/feed": "OPEN"})
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run", "--section", "feed-page"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	ghCalls, err := os.ReadFile(ghCallsPath)
@@ -296,7 +321,7 @@ func oneLintPlan() string {
 // runLint writes plan to a temp file, runs nightcap lint on it, and returns the exit code and stdout.
 func runLint(t *testing.T, plan string) (int, string) {
 	t.Helper()
-	planPath := filepath.Join(t.TempDir(), "plan.md")
+	planPath := filepath.Join(t.TempDir(), "commit-bot.md")
 	if err := os.WriteFile(planPath, []byte(plan), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -351,12 +376,9 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
-	yml := []byte("max_rounds: 2\ntargets:\n  - plan: plan.md\n    repo: " + repo + "\n    check: echo $$; false\n")
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	first, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log"))

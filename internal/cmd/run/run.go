@@ -2,7 +2,7 @@ package run
 
 import (
 	"context"
-	"flag"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,15 +23,26 @@ import (
 	"nightcap/internal/usage"
 )
 
-// Run is the "run" subcommand; args is everything after "run", where --section names one heading.
-// For now it picks tonight's heading per target, checks its branch out in a worktree and runs
-// the first unit that has a check through runUnit; it returns an error when the config,
-// a plan file, git, claude or sh fails.
+// Run is the "run" subcommand; args is everything after "run", and its first item is the plan file.
+// For now it picks the plan's top heading that has a unit to take, checks its branch out in a worktree of the frontmatter's repo and runs
+// the first unit that has a check through runUnit; it returns an error when no plan file is named,
+// or when the config, the plan file, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) error {
-	flags := flag.NewFlagSet("run", flag.ContinueOnError)
-	sectionName := flags.String("section", "", "heading title or slug to take")
-	if err := flags.Parse(args); err != nil {
+	if len(args) == 0 {
+		return errors.New("run: name a plan file")
+	}
+	planPath := args[0]
+	planText, err := os.ReadFile(planPath)
+	if err != nil {
 		return err
+	}
+	meta, err := plan.ParseMeta(string(planText))
+	if err != nil {
+		return err
+	}
+	// a key left out reads as nil, while "protected: []" is an empty list that means none
+	if meta.Repo == "" || meta.Test == "" || meta.Protected == nil || meta.Dependencies == nil {
+		return errors.New("run: the plan's frontmatter needs repo, test, protected and dependencies")
 	}
 	loaded, err := config.Load(".")
 	if err != nil {
@@ -41,101 +52,95 @@ func Run(args []string, stdout io.Writer) error {
 	defer stop()
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
-	defer func() { sendNightSummary(ctx, loaded, started, startUsage) }()
+	defer func() { sendNightSummary(ctx, loaded, meta.Repo, started, startUsage) }()
 
-	for _, target := range loaded.Targets {
-		planText, err := os.ReadFile(target.Plan)
-		if err != nil {
-			return err
+	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
+	saved, err := state.Load(statePath)
+	if err != nil {
+		return err
+	}
+	var notBlocked []plan.Section
+	hasPR := map[string]bool{}
+	baseFor := map[string]string{}
+	previousOpenBranch := ""
+	stackOnto := map[string]string{}
+	previousOpenURL := ""
+	for _, section := range plan.Parse(string(planText)) {
+		baseFor[section.Slug] = "main"
+		if previousOpenBranch != "" {
+			baseFor[section.Slug] = previousOpenBranch
 		}
-		statePath := filepath.Join(target.Repo, ".nightcap", "state.json")
-		saved, err := state.Load(statePath)
-		if err != nil {
-			return err
-		}
-		var notBlocked []plan.Section
-		hasPR := map[string]bool{}
-		baseFor := map[string]string{}
-		previousOpenBranch := ""
-		stackOnto := map[string]string{}
-		previousOpenURL := ""
-		for _, section := range plan.Parse(string(planText)) {
-			baseFor[section.Slug] = "main"
-			if previousOpenBranch != "" {
-				baseFor[section.Slug] = previousOpenBranch
-			}
-			stackOnto[section.Slug] = previousOpenURL
-			previousOpenBranch = ""
-			previousOpenURL = ""
-			if state.IsBlocked(saved.Sections[section.Slug]) {
-				fmt.Fprintf(stdout, "skip %s: blocked\n", section.Title)
-				continue
-			}
-			if len(section.Units) > 0 {
-				view, err := pr.ViewBranch(target.Repo, section.Type+"/"+section.Slug)
-				if err != nil {
-					return err
-				}
-				if err := state.SavePRStatus(statePath, section.Slug, view.URL, view.State); err != nil {
-					return err
-				}
-				if view.State == "MERGED" || view.State == "CLOSED" {
-					fmt.Fprintf(stdout, "skip %s: PR %s\n", section.Title, strings.ToLower(view.State))
-					continue
-				}
-				hasPR[section.Slug] = view.State == "OPEN"
-				if hasPR[section.Slug] {
-					previousOpenBranch = section.Type + "/" + section.Slug
-					previousOpenURL = view.URL
-				}
-			}
-			notBlocked = append(notBlocked, section)
-		}
-		section, ok := plan.Pick(notBlocked, *sectionName)
-		if !ok {
-			fmt.Fprintf(stdout, "%s: nothing to take\n", target.Plan)
+		stackOnto[section.Slug] = previousOpenURL
+		previousOpenBranch = ""
+		previousOpenURL = ""
+		if state.IsBlocked(saved.Sections[section.Slug]) {
+			fmt.Fprintf(stdout, "skip %s: blocked\n", section.Title)
 			continue
 		}
-		base := baseFor[section.Slug]
-		branch := section.Type + "/" + section.Slug
-		worktreeDir, err := git.AddWorktree(target.Repo, base, branch, section.Slug)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", target.Plan, branch, worktreeDir)
-		for _, unit := range section.Units {
-			mark := "skip"
-			if unit.HasCheck {
-				mark = "take"
+		if len(section.Units) > 0 {
+			view, err := pr.ViewBranch(meta.Repo, section.Type+"/"+section.Slug)
+			if err != nil {
+				return err
 			}
-			fmt.Fprintf(stdout, "  %s  %s\n", mark, unit.Title)
-		}
-
-		for index, unit := range section.Units {
-			if !unit.HasCheck {
+			if err := state.SavePRStatus(statePath, section.Slug, view.URL, view.State); err != nil {
+				return err
+			}
+			if view.State == "MERGED" || view.State == "CLOSED" {
+				fmt.Fprintf(stdout, "skip %s: PR %s\n", section.Title, strings.ToLower(view.State))
 				continue
 			}
-			// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
-			usageJSON, _ := claude.Usage(ctx)
-			current, _ := usage.Read(usageJSON)
-			if !startUsage.Known {
-				startUsage = current
+			hasPR[section.Slug] = view.State == "OPEN"
+			if hasPR[section.Slug] {
+				previousOpenBranch = section.Type + "/" + section.Slug
+				previousOpenURL = view.URL
 			}
-			if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
-				fmt.Fprintf(stdout, "  stop: %s\n", reason)
-				return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
-			}
-			if err := runUnit(ctx, stdout, loaded, target, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
-				return err
-			}
-			if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
-				return err
-			}
-			if err := labelWhenFinished(stdout, statePath, worktreeDir, target.MergeMethod, section); err != nil {
-				return err
-			}
-			break
 		}
+		notBlocked = append(notBlocked, section)
+	}
+	section, ok := plan.Pick(notBlocked)
+	if !ok {
+		fmt.Fprintf(stdout, "%s: nothing to take\n", planPath)
+		return nil
+	}
+	base := baseFor[section.Slug]
+	branch := section.Type + "/" + section.Slug
+	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, section.Slug)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", planPath, branch, worktreeDir)
+	for _, unit := range section.Units {
+		mark := "skip"
+		if unit.HasCheck {
+			mark = "take"
+		}
+		fmt.Fprintf(stdout, "  %s  %s\n", mark, unit.Title)
+	}
+
+	for index, unit := range section.Units {
+		if !unit.HasCheck {
+			continue
+		}
+		// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
+		usageJSON, _ := claude.Usage(ctx)
+		current, _ := usage.Read(usageJSON)
+		if !startUsage.Known {
+			startUsage = current
+		}
+		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
+			fmt.Fprintf(stdout, "  stop: %s\n", reason)
+			return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
+		}
+		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
+			return err
+		}
+		if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
+			return err
+		}
+		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, section); err != nil {
+			return err
+		}
+		break
 	}
 	return nil
 }
@@ -144,13 +149,13 @@ func Run(args []string, stdout io.Writer) error {
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
 // or claude stops before Done. Every round's outcome goes into the state file at statePath.
 // It returns an error only when claude, sh, git or the state file fails.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, worktreeDir, base, slug string, number int, unit plan.Unit, statePath string) error {
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Unit, statePath string) error {
 	failureTail := ""
 	sessionID := ""
 	record := state.Unit{}
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
-		logPath := filepath.Join(target.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
+		logPath := filepath.Join(meta.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
 		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(unit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
 			return err
@@ -180,7 +185,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 			break
 		}
 		// 1. Check: run the check command from nightcap.yml (tests pass or not)
-		checked, err := check.Run(ctx, worktreeDir, target.Check)
+		checked, err := check.Run(ctx, worktreeDir, meta.Test)
 		if err != nil {
 			return err
 		}
@@ -189,7 +194,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
 		if checked.Green {
-			verdict, err := classifyBranch(stdout, worktreeDir, base, target, unit)
+			verdict, err := classifyBranch(stdout, worktreeDir, base, meta, unit)
 			if err != nil {
 				return err
 			}
@@ -266,7 +271,7 @@ func color(green bool) string {
 
 // classifyBranch prints the files and the count of lines worktreeDir's branch changed, then the verdict on them.
 // It returns that verdict, or an error when git fails.
-func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Target, unit plan.Unit) (check.Verdict, error) {
+func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, unit plan.Unit) (check.Verdict, error) {
 	changes, err := git.ChangedFiles(worktreeDir, base)
 	if err != nil {
 		return check.Verdict{}, err
@@ -279,7 +284,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Ta
 		return check.Verdict{}, err
 	}
 	fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
-	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), target.ReadCode, target.Protected, target.Dependencies)
+	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), meta.Protected, meta.Dependencies)
 	if verdict.Red {
 		fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
 	} else if verdict.ReadCode {
@@ -394,12 +399,9 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	return nil
 }
 
-// sendNightSummary sends the morning message: the repos, the times and, when a unit ran, the usage. A failed send only prints to stderr.
-func sendNightSummary(ctx context.Context, loaded config.Config, started time.Time, startUsage usage.Usage) {
-	night := notify.Night{Start: started, End: time.Now()}
-	for _, target := range loaded.Targets {
-		night.Repos = append(night.Repos, filepath.Base(target.Repo))
-	}
+// sendNightSummary sends the morning message: the repo, the times and, when a unit ran, the usage. A failed send only prints to stderr.
+func sendNightSummary(ctx context.Context, loaded config.Config, repo string, started time.Time, startUsage usage.Usage) {
+	night := notify.Night{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
 	if startUsage.Known {
 		usageJSON, _ := claude.Usage(ctx)
 		if endUsage, _ := usage.Read(usageJSON); endUsage.Known {

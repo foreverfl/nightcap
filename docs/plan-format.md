@@ -1,6 +1,6 @@
 # Plan format
 
-nightcap reads one markdown file per target. See `examples/plan.md` for a full one.
+nightcap reads the one markdown file you pass to `nightcap run`. It starts with a frontmatter naming repo, test, protected and dependencies, as the README shows. See `examples/plan.md` for a full one.
 
 ## Heading = one PR
 
@@ -15,7 +15,7 @@ Notes can be listed and added over HTTP, so the web page has something to call.
   - `🤖`: `nightcap:auto`. GitHub auto-merge is turned on, so the PR merges once the required checks pass. For PRs that only add contract and test files
   - `📄`: `nightcap:read-pr`. The body and the risk list are enough
   - `👤`: a person does this PR by hand. nightcap never picks it
-- What nightcap notices at night (outside WHERE, a read_code path, a migration) goes into the risk list, never into the label.
+- What nightcap notices at night (outside WHERE, a migration) goes into the risk list, never into the label.
 - A heading without a mark is skipped, and `nightcap lint` prints it as `no mark:`.
 - `type` is one of `feat`, `fix`, `test`, `docs`, `refactor`, `chore`.
 - The branch is `type/slug` and the PR title is `type: title`.
