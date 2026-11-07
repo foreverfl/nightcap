@@ -9,6 +9,8 @@ type Config struct {
 	LimitWeeklyAll int      `yaml:"limit_weekly_all"` // weekly all-models % above which no new unit starts; 0 means no cap
 	AllowedTools   []string `yaml:"allowed_tools"`    // claude --allowedTools; read, edit, and only local commands
 	Webhook        string   `yaml:"webhook"`          // Discord or Slack webhook URL for the end-of-night message; empty sends nothing
+	Lang           []string `yaml:"lang"`             // PR body languages, e.g. [ko] or [en, ko]
+	MergeMethod    string   `yaml:"merge_method"`     // how a 🤖 PR auto-merges: rebase, otherwise merge
 	Targets        []Target `yaml:"targets"`
 }
 
@@ -18,8 +20,6 @@ type Target struct {
 	Repo         string   `yaml:"repo"`
 	Check        string   `yaml:"check"`
 	ReadCode     []string `yaml:"read_code"`    // path globs that always send a PR to read-code
-	MergeMethod  string   `yaml:"merge_method"` // how auto-merge merges: rebase, otherwise merge
 	Protected    []string `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
 	Dependencies []string `yaml:"dependencies"` // dependency file globs the agent may not touch
-	Lang         []string `yaml:"lang"`         // PR body languages, e.g. [ko] or [en, ko]
 }

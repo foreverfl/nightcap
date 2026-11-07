@@ -27,8 +27,8 @@ func TestLoadFillsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools,
-		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check", Lang: []string{"ko"}, MergeMethod: "merge",
+	want := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools, Lang: []string{"ko"}, MergeMethod: "merge",
+		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check",
 			Protected: defaultProtected, Dependencies: defaultDependencies}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -69,12 +69,12 @@ func TestLoadRequiresPlanInTarget(t *testing.T) {
 }
 
 func TestLoadReadsLang(t *testing.T) {
-	got, err := loadFrom(t, oneConfig()+"    lang: [en, ko]\n")
+	got, err := loadFrom(t, "lang: [en, ko]\n"+oneConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(got.Targets[0].Lang, []string{"en", "ko"}) {
-		t.Fatalf("Lang = %v, want [en ko]", got.Targets[0].Lang)
+	if !reflect.DeepEqual(got.Lang, []string{"en", "ko"}) {
+		t.Fatalf("Lang = %v, want [en ko]", got.Lang)
 	}
 }
 

@@ -38,7 +38,7 @@ func Load(dir string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	config := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools}
+	config := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools, Lang: []string{"ko"}, MergeMethod: "merge"}
 	if err := yaml.Unmarshal(raw, &config); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", FileName, err)
 	}
@@ -52,12 +52,6 @@ func Load(dir string) (Config, error) {
 		}
 		target.Plan = expandHome(target.Plan)
 		target.Repo = expandHome(target.Repo)
-		if len(target.Lang) == 0 {
-			target.Lang = []string{"ko"}
-		}
-		if target.MergeMethod == "" {
-			target.MergeMethod = "merge"
-		}
 		if len(target.Protected) == 0 {
 			target.Protected = defaultProtected
 		}

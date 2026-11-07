@@ -128,10 +128,10 @@ func Run(args []string, stdout io.Writer) error {
 			if err := runUnit(ctx, stdout, loaded, target, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
-			if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
+			if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
 				return err
 			}
-			if err := labelWhenFinished(stdout, statePath, worktreeDir, target.MergeMethod, section); err != nil {
+			if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, section); err != nil {
 				return err
 			}
 			break
