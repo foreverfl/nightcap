@@ -28,26 +28,38 @@ func setUpRepoWithOneUnitPlan(t *testing.T) string {
 			t.Fatalf("git %v: %v\n%s", args, err, output)
 		}
 	}
-	planText := []byte(strings.Join([]string{
+	writePlanAndConfig(t, repo, "true", "")
+	useFakeGh(t, nil)
+	return repo
+}
+
+// writePlan writes plan.md: a frontmatter naming repo and the test command, then one heading with one unit.
+func writePlan(t *testing.T, repo, test string) {
+	t.Helper()
+	planText := strings.Join([]string{
+		"---",
+		"repo: " + repo,
+		"test: " + test,
+		"---",
+		"",
 		"## 📄 feat: feed (feed)",
 		"",
 		"- [ ] add it",
 		"  - DONE  go test passes",
-	}, "\n") + "\n")
-	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
+	}, "\n") + "\n"
+	if err := os.WriteFile("plan.md", []byte(planText), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	yml := []byte(strings.Join([]string{
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: true",
-	}, "\n") + "\n")
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
+}
+
+// writePlanAndConfig writes plan.md through writePlan, then nightcap.yml: extra lines first, then one target running plan.md in repo with test as its check.
+func writePlanAndConfig(t *testing.T, repo, test, extra string) {
+	t.Helper()
+	writePlan(t, repo, test)
+	yml := extra + "targets:\n  - plan: plan.md\n    repo: " + repo + "\n    check: " + test + "\n"
+	if err := os.WriteFile("nightcap.yml", []byte(yml), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	useFakeGh(t, nil)
-	return repo
 }
 
 // useFakeClaude points NIGHTCAP_CLAUDE at a script that answers every round with a Done result JSON.
@@ -112,16 +124,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
-	yml := []byte(strings.Join([]string{
-		"max_rounds: 2",
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: echo $$; false",
-	}, "\n"))
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
@@ -138,16 +141,7 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 func TestRunMarksUnitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
-	yml := []byte(strings.Join([]string{
-		"max_rounds: 3",
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: false",
-	}, "\n"))
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "false", "max_rounds: 3\n")
 	var stdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
@@ -183,16 +177,7 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
-	yml := []byte(strings.Join([]string{
-		"max_rounds: 3",
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: true",
-	}, "\n"))
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "true", "max_rounds: 3\n")
 	var stdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
@@ -209,16 +194,7 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
-	yml := []byte(strings.Join([]string{
-		"max_rounds: 2",
-		"targets:",
-		"  - plan: plan.md",
-		"    repo: " + repo,
-		"    check: false",
-	}, "\n"))
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "false", "max_rounds: 2\n")
 	var firstStdout, secondStdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run"}, &firstStdout, &stderr); code != 0 {
 		t.Fatalf("first run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
@@ -351,10 +327,7 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
-	yml := []byte("max_rounds: 2\ntargets:\n  - plan: plan.md\n    repo: " + repo + "\n    check: echo $$; false\n")
-	if err := os.WriteFile("nightcap.yml", yml, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
