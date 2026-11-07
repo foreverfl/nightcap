@@ -23,7 +23,6 @@ targets:
   - plan: ~/work/todolist/blog-v2/github-rank-commit.md
     repo: ~/workspace/apps-web/blog-v2
     check: make check
-    read_code: [services/go-api/internal/auth/*]
     lang: [en, ko]            # PR body languages, default [ko]
     merge_method: rebase      # how a 🤖 PR auto-merges: rebase, otherwise merge. default merge
 ```

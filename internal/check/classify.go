@@ -49,8 +49,8 @@ const migrationPathWord = "migration"
 
 // Classify returns a red Verdict when a change touches one of dependencies, modifies or deletes an existing
 // file matching protected (adding a new one is allowed), or an added line carries a skip marker; past those, a ReadCode
-// one when a change matches readCode, adds a migration or sits outside wherePaths. Otherwise an empty Verdict.
-func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, readCode, protected, dependencies []string) Verdict {
+// one when a change adds a migration or sits outside wherePaths. Otherwise an empty Verdict.
+func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, protected, dependencies []string) Verdict {
 	for _, change := range changes {
 		if matchesAny(change.Path, dependencies) {
 			return Verdict{Red: true, Reason: "changed a dependency file: " + change.Path}
@@ -65,9 +65,6 @@ func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, read
 		}
 	}
 	for _, change := range changes {
-		if matchesAny(change.Path, readCode) {
-			return Verdict{ReadCode: true, Reason: "matches read_code: " + change.Path}
-		}
 		if change.Status == "A" && strings.Contains(change.Path, migrationPathWord) {
 			return Verdict{ReadCode: true, Reason: "added a migration: " + change.Path}
 		}

@@ -23,7 +23,6 @@ targets:
   - plan: ~/work/todolist/blog-v2/github-rank-commit.md
     repo: ~/workspace/apps-web/blog-v2
     check: make check
-    read_code: [services/go-api/internal/auth/*]
     lang: [en, ko]            # PR 본문 언어, 기본값 [ko]
     merge_method: rebase      # 🤖 PR이 auto-merge될 때 방식: rebase면 rebase, 아니면 merge. 기본값 merge
 ```

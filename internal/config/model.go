@@ -19,7 +19,6 @@ type Target struct {
 	Plan         string   `yaml:"plan"`
 	Repo         string   `yaml:"repo"`
 	Check        string   `yaml:"check"`
-	ReadCode     []string `yaml:"read_code"`    // path globs that always send a PR to read-code
 	Protected    []string `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
 	Dependencies []string `yaml:"dependencies"` // dependency file globs the agent may not touch
 }
