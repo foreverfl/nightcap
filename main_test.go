@@ -33,7 +33,7 @@ func setUpRepoWithOneUnitPlan(t *testing.T) string {
 	return repo
 }
 
-// writePlan writes plan.md: a frontmatter naming repo and the test command, then one heading with one unit.
+// writePlan writes commit-bot.md: a frontmatter naming repo and the test command, then one heading with one unit.
 func writePlan(t *testing.T, repo, test string) {
 	t.Helper()
 	planText := strings.Join([]string{
@@ -47,16 +47,16 @@ func writePlan(t *testing.T, repo, test string) {
 		"- [ ] add it",
 		"  - DONE  go test passes",
 	}, "\n") + "\n"
-	if err := os.WriteFile("plan.md", []byte(planText), 0o644); err != nil {
+	if err := os.WriteFile("commit-bot.md", []byte(planText), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// writePlanAndConfig writes plan.md through writePlan, then nightcap.yml: extra lines first, then one target running plan.md in repo with test as its check.
+// writePlanAndConfig writes commit-bot.md through writePlan, then nightcap.yml: extra lines first, then one target running commit-bot.md in repo with test as its check.
 func writePlanAndConfig(t *testing.T, repo, test, extra string) {
 	t.Helper()
 	writePlan(t, repo, test)
-	yml := extra + "targets:\n  - plan: plan.md\n    repo: " + repo + "\n    check: " + test + "\n"
+	yml := extra + "targets:\n  - plan: commit-bot.md\n    repo: " + repo + "\n    check: " + test + "\n"
 	if err := os.WriteFile("nightcap.yml", []byte(yml), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -100,12 +100,12 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	var stdout, stderr bytes.Buffer
-	code := dispatch([]string{"run"}, &stdout, &stderr)
+	code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	want := strings.Join([]string{
-		"plan.md",
+		"commit-bot.md",
 		"  branch: feat/feed",
 		"  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed"),
 		"  take  add it",
@@ -126,7 +126,7 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
@@ -143,7 +143,7 @@ func TestRunMarksUnitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "false", "max_rounds: 3\n")
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
@@ -179,7 +179,7 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 	writePlanAndConfig(t, repo, "true", "max_rounds: 3\n")
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
@@ -196,15 +196,15 @@ func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "false", "max_rounds: 2\n")
 	var firstStdout, secondStdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &firstStdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &firstStdout, &stderr); code != 0 {
 		t.Fatalf("first run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	if code := dispatch([]string{"run"}, &secondStdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &secondStdout, &stderr); code != 0 {
 		t.Fatalf("second run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	want := strings.Join([]string{
 		"skip feed: blocked",
-		"plan.md: nothing to take",
+		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if secondStdout.String() != want {
 		t.Fatalf("second run stdout = %q, want %q", secondStdout.String(), want)
@@ -215,15 +215,22 @@ func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
 	setUpRepoWithOneUnitPlan(t)
 	useFakeGh(t, map[string]string{"feat/feed": "MERGED"})
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	want := strings.Join([]string{
 		"skip feed: PR merged",
-		"plan.md: nothing to take",
+		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if stdout.String() != want {
 		t.Fatalf("a heading whose PR was merged should be skipped, got %q", stdout.String())
+	}
+}
+
+func TestRunWithoutAPlanFileFails(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "run: name a plan file") {
+		t.Fatalf("want exit 1 and run: name a plan file, got %d %q", code, stderr.String())
 	}
 }
 
@@ -241,7 +248,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 		"- [ ] show it",
 		"  - DONE  go test passes",
 	}, "\n") + "\n")
-	if err := os.WriteFile("plan.md", planText, 0o644); err != nil {
+	if err := os.WriteFile("commit-bot.md", planText, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if output, err := exec.Command("git", "-C", repo, "branch", "feat/feed").CombinedOutput(); err != nil {
@@ -249,7 +256,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	}
 	ghCallsPath := useFakeGh(t, map[string]string{"feat/feed": "OPEN"})
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run", "--section", "feed-page"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "--section", "feed-page", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	ghCalls, err := os.ReadFile(ghCallsPath)
@@ -272,7 +279,7 @@ func oneLintPlan() string {
 // runLint writes plan to a temp file, runs nightcap lint on it, and returns the exit code and stdout.
 func runLint(t *testing.T, plan string) (int, string) {
 	t.Helper()
-	planPath := filepath.Join(t.TempDir(), "plan.md")
+	planPath := filepath.Join(t.TempDir(), "commit-bot.md")
 	if err := os.WriteFile(planPath, []byte(plan), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +336,7 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run"}, &stdout, &stderr); code != 0 {
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	first, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log"))

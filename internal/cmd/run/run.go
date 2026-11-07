@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -23,15 +24,19 @@ import (
 	"nightcap/internal/usage"
 )
 
-// Run is the "run" subcommand; args is everything after "run", where --section names one heading.
-// For now it picks tonight's heading per target, checks its branch out in a worktree and runs
-// the first unit that has a check through runUnit; it returns an error when the config,
-// a plan file, git, claude or sh fails.
+// Run is the "run" subcommand; args is everything after "run": the plan file, with --section naming one heading.
+// For now it picks tonight's heading of that plan per target, checks its branch out in a worktree and runs
+// the first unit that has a check through runUnit; it returns an error when no plan file is named,
+// or when the config, the plan file, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	sectionName := flags.String("section", "", "heading title or slug to take")
 	if err := flags.Parse(args); err != nil {
 		return err
+	}
+	planPath := flags.Arg(0)
+	if planPath == "" {
+		return errors.New("run: name a plan file")
 	}
 	loaded, err := config.Load(".")
 	if err != nil {
@@ -44,7 +49,7 @@ func Run(args []string, stdout io.Writer) error {
 	defer func() { sendNightSummary(ctx, loaded, started, startUsage) }()
 
 	for _, target := range loaded.Targets {
-		planText, err := os.ReadFile(target.Plan)
+		planText, err := os.ReadFile(planPath)
 		if err != nil {
 			return err
 		}
