@@ -124,7 +124,7 @@ func Run(args []string, stdout io.Writer) error {
 			if err := openDraftPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
 				return err
 			}
-			if err := markReadyWhenFinished(stdout, statePath, worktreeDir, section); err != nil {
+			if err := markReadyWhenFinished(stdout, statePath, worktreeDir, target.MergeMethod, section); err != nil {
 				return err
 			}
 			break
@@ -361,7 +361,7 @@ func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle s
 }
 
 // markReadyWhenFinished marks the PR ready when every unit is done, adds the label the heading's mark names, and turns on auto-merge for 🤖.
-func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir string, section plan.Section) error {
+func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, section plan.Section) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -383,7 +383,7 @@ func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir string, sect
 	}
 	fmt.Fprintf(stdout, "  label: %s\n", label)
 	if section.Mark == plan.MarkAuto {
-		if err := pr.EnableAutoMerge(worktreeDir, branch); err != nil {
+		if err := pr.EnableAutoMerge(worktreeDir, branch, mergeMethod); err != nil {
 			return err
 		}
 		fmt.Fprintf(stdout, "  auto-merge: %s\n", branch)

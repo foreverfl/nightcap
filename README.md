@@ -24,4 +24,5 @@ targets:
     check: make check
     read_code: [services/go-api/internal/auth/*]
     lang: [en, ko]            # PR body languages, default [ko]
+    merge_method: rebase      # how a 🤖 PR auto-merges: rebase, otherwise merge. default merge
 ```

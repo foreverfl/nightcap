@@ -28,7 +28,7 @@ func TestLoadFillsDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools,
-		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check", Lang: []string{"ko"},
+		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check", Lang: []string{"ko"}, MergeMethod: "merge",
 			Protected: defaultProtected, Dependencies: defaultDependencies}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
