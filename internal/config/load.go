@@ -19,11 +19,11 @@ var defaultAllowedTools = []string{
 	"Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)",
 }
 
-// defaultProtected are the contract files a target gets when nightcap.yml names none.
-var defaultProtected = []string{"*_test.go", "*.hurl", "openapi/*", "Makefile"}
+// DefaultProtected are the contract files a plan gets when its frontmatter names none.
+var DefaultProtected = []string{"*_test.go", "*.hurl", "openapi/*", "Makefile"}
 
-// defaultDependencies are the dependency files a target gets when nightcap.yml names none.
-var defaultDependencies = []string{
+// DefaultDependencies are the dependency files a plan gets when its frontmatter names none.
+var DefaultDependencies = []string{
 	"go.mod", "go.sum",
 	"Cargo.toml", "Cargo.lock",
 	"package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
@@ -53,10 +53,10 @@ func Load(dir string) (Config, error) {
 		target.Plan = expandHome(target.Plan)
 		target.Repo = expandHome(target.Repo)
 		if len(target.Protected) == 0 {
-			target.Protected = defaultProtected
+			target.Protected = DefaultProtected
 		}
 		if len(target.Dependencies) == 0 {
-			target.Dependencies = defaultDependencies
+			target.Dependencies = DefaultDependencies
 		}
 	}
 	return config, nil

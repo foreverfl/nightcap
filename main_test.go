@@ -256,6 +256,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	planText := []byte(strings.Join([]string{
 		"---",
 		"repo: " + repo,
+		"test: true",
 		"---",
 		"",
 		"## 📄 feat: feed (feed)",

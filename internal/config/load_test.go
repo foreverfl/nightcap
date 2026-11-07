@@ -29,7 +29,7 @@ func TestLoadFillsDefaults(t *testing.T) {
 	}
 	want := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools, Lang: []string{"ko"}, MergeMethod: "merge",
 		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check",
-			Protected: defaultProtected, Dependencies: defaultDependencies}}}
+			Protected: DefaultProtected, Dependencies: DefaultDependencies}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}

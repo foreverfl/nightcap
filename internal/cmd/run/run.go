@@ -35,10 +35,21 @@ func Run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if meta, err := plan.ParseMeta(string(planText)); err != nil {
+	meta, err := plan.ParseMeta(string(planText))
+	if err != nil {
 		return err
-	} else if meta.Repo == "" {
+	}
+	if meta.Repo == "" {
 		return errors.New("run: the plan's frontmatter needs repo")
+	}
+	if meta.Test == "" {
+		meta.Test = "make check"
+	}
+	if len(meta.Protected) == 0 {
+		meta.Protected = config.DefaultProtected
+	}
+	if len(meta.Dependencies) == 0 {
+		meta.Dependencies = config.DefaultDependencies
 	}
 	loaded, err := config.Load(".")
 	if err != nil {
@@ -48,10 +59,10 @@ func Run(args []string, stdout io.Writer) error {
 	defer stop()
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
-	defer func() { sendNightSummary(ctx, loaded, started, startUsage) }()
+	defer func() { sendNightSummary(ctx, loaded, meta.Repo, started, startUsage) }()
 
 	for _, target := range loaded.Targets {
-		statePath := filepath.Join(target.Repo, ".nightcap", "state.json")
+		statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
 		saved, err := state.Load(statePath)
 		if err != nil {
 			return err
@@ -75,7 +86,7 @@ func Run(args []string, stdout io.Writer) error {
 				continue
 			}
 			if len(section.Units) > 0 {
-				view, err := pr.ViewBranch(target.Repo, section.Type+"/"+section.Slug)
+				view, err := pr.ViewBranch(meta.Repo, section.Type+"/"+section.Slug)
 				if err != nil {
 					return err
 				}
@@ -101,7 +112,7 @@ func Run(args []string, stdout io.Writer) error {
 		}
 		base := baseFor[section.Slug]
 		branch := section.Type + "/" + section.Slug
-		worktreeDir, err := git.AddWorktree(target.Repo, base, branch, section.Slug)
+		worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, section.Slug)
 		if err != nil {
 			return err
 		}
@@ -128,7 +139,6 @@ func Run(args []string, stdout io.Writer) error {
 				fmt.Fprintf(stdout, "  stop: %s\n", reason)
 				return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
 			}
-			meta := plan.Meta{Repo: target.Repo, Test: target.Check, Protected: target.Protected, Dependencies: target.Dependencies}
 			if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
@@ -398,12 +408,9 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	return nil
 }
 
-// sendNightSummary sends the morning message: the repos, the times and, when a unit ran, the usage. A failed send only prints to stderr.
-func sendNightSummary(ctx context.Context, loaded config.Config, started time.Time, startUsage usage.Usage) {
-	night := notify.Night{Start: started, End: time.Now()}
-	for _, target := range loaded.Targets {
-		night.Repos = append(night.Repos, filepath.Base(target.Repo))
-	}
+// sendNightSummary sends the morning message: the repo, the times and, when a unit ran, the usage. A failed send only prints to stderr.
+func sendNightSummary(ctx context.Context, loaded config.Config, repo string, started time.Time, startUsage usage.Usage) {
+	night := notify.Night{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
 	if startUsage.Known {
 		usageJSON, _ := claude.Usage(ctx)
 		if endUsage, _ := usage.Read(usageJSON); endUsage.Known {
