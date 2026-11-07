@@ -234,10 +234,30 @@ func TestRunWithoutAPlanFileFails(t *testing.T) {
 	}
 }
 
+func TestRunWithoutRepoInTheFrontmatterFails(t *testing.T) {
+	t.Chdir(t.TempDir())
+	planText := strings.Join([]string{
+		"---",
+		"test: true",
+		"---",
+	}, "\n") + "\n"
+	if err := os.WriteFile("commit-bot.md", []byte(planText), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "run: the plan's frontmatter needs repo") {
+		t.Fatalf("want exit 1 and the frontmatter needs repo, got %d %q", code, stderr.String())
+	}
+}
+
 func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	planText := []byte(strings.Join([]string{
+		"---",
+		"repo: " + repo,
+		"---",
+		"",
 		"## 📄 feat: feed (feed)",
 		"",
 		"- [ ] add it",

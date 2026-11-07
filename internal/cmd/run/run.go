@@ -31,7 +31,15 @@ func Run(args []string, stdout io.Writer) error {
 	if len(args) == 0 {
 		return errors.New("run: name a plan file")
 	}
-	planPath := args[0]
+	planText, err := os.ReadFile(args[0])
+	if err != nil {
+		return err
+	}
+	if meta, err := plan.ParseMeta(string(planText)); err != nil {
+		return err
+	} else if meta.Repo == "" {
+		return errors.New("run: the plan's frontmatter needs repo")
+	}
 	loaded, err := config.Load(".")
 	if err != nil {
 		return err
@@ -43,10 +51,6 @@ func Run(args []string, stdout io.Writer) error {
 	defer func() { sendNightSummary(ctx, loaded, started, startUsage) }()
 
 	for _, target := range loaded.Targets {
-		planText, err := os.ReadFile(planPath)
-		if err != nil {
-			return err
-		}
 		statePath := filepath.Join(target.Repo, ".nightcap", "state.json")
 		saved, err := state.Load(statePath)
 		if err != nil {
