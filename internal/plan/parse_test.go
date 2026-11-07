@@ -121,7 +121,7 @@ func TestPickNeverTakesAPersonHeading(t *testing.T) {
 }
 
 func TestParseReadsEachReadingMark(t *testing.T) {
-	want := map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👀": MarkReadCode, "👤": MarkPerson}
+	want := map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👤": MarkPerson}
 	for symbol, mark := range want {
 		section := Parse(strings.Replace(oneSection(), "📄", symbol, 1))[0]
 		if section.Mark != mark || section.Type != "feat" {

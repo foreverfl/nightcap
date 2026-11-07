@@ -8,9 +8,9 @@ import (
 
 func TestReadingLabelFollowsTheMark(t *testing.T) {
 	want := map[plan.Mark]string{
-		plan.MarkAuto:     "nightcap:auto",
-		plan.MarkReadPR:   "nightcap:read-pr",
-		plan.MarkReadCode: "nightcap:read-code",
+		plan.MarkAuto:   "nightcap:auto",
+		plan.MarkReadPR: "nightcap:read-pr",
+		plan.MarkNone:   "nightcap:read-pr",
 	}
 	for mark, label := range want {
 		if got := ReadingLabel(mark); got != label {

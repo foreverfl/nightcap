@@ -27,7 +27,7 @@ func TestBuildBodyListsUnitsAndTheReadCodeReason(t *testing.T) {
 		"- 피드 화면: go test . 통과",
 		"",
 		"## 위험",
-		"- 코드까지 읽어야 함: outside WHERE: main.go",
+		"- outside WHERE: main.go",
 		"",
 		"## 확인한 것",
 		"```",

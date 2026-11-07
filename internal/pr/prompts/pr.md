@@ -19,7 +19,7 @@
 {{- end}}
 {{- range .Units}}
   {{- if .ReadCodeReason}}
-- 코드까지 읽어야 함: {{.ReadCodeReason}}
+- {{.ReadCodeReason}}
   {{- end}}
 {{- end}}
 {{- range .Risks}}
