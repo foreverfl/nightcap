@@ -401,17 +401,17 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 
 // sendNightSummary sends the morning message: the repo, the times and, when a unit ran, the usage. A failed send only prints to stderr.
 func sendNightSummary(ctx context.Context, loaded config.Config, repo string, started time.Time, startUsage usage.Usage) {
-	night := notify.Night{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
+	summary := notify.Summary{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
 	if startUsage.Known {
 		usageJSON, _ := claude.Usage(ctx)
 		if endUsage, _ := usage.Read(usageJSON); endUsage.Known {
-			night.Usage = []notify.UsageLine{
+			summary.Usage = []notify.UsageLine{
 				{Name: "session", Start: startUsage.Session.Percent, End: endUsage.Session.Percent},
 				{Name: "weekly", Start: startUsage.WeeklyAll.Percent, End: endUsage.WeeklyAll.Percent},
 			}
 		}
 	}
-	if err := notify.Send(loaded.Webhook, notify.Message(night)); err != nil {
+	if err := notify.Send(loaded.Webhook, notify.Message(summary)); err != nil {
 		fmt.Fprintln(os.Stderr, "notify:", err)
 	}
 }

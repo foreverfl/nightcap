@@ -8,8 +8,8 @@ import (
 	"nightcap/internal/plan"
 )
 
-// Night is what one nightcap run did, as the morning message reports it.
-type Night struct {
+// Summary is what one nightcap run did, as the morning message reports it.
+type Summary struct {
 	Repos      []string
 	Start, End time.Time
 	Usage      []UsageLine // empty when no unit ran or /usage could not be read
@@ -33,15 +33,15 @@ type UsageLine struct {
 
 // Message builds the end-of-night message: the repos and times, one indented line per usage limit,
 // then after a blank line one line per PR.
-func Message(night Night) string {
-	lines := []string{fmt.Sprintf("🌙 nightcap %s · %s → %s", strings.Join(night.Repos, ", "), night.Start.Format("15:04"), night.End.Format("15:04"))}
-	for _, limit := range night.Usage {
+func Message(summary Summary) string {
+	lines := []string{fmt.Sprintf("🌙 nightcap %s · %s → %s", strings.Join(summary.Repos, ", "), summary.Start.Format("15:04"), summary.End.Format("15:04"))}
+	for _, limit := range summary.Usage {
 		lines = append(lines, fmt.Sprintf("  %-7s %d%% → %d%%", limit.Name, limit.Start, limit.End))
 	}
-	if len(night.PRs) > 0 {
+	if len(summary.PRs) > 0 {
 		lines = append(lines, "")
 	}
-	for _, pr := range night.PRs {
+	for _, pr := range summary.PRs {
 		lines = append(lines, prLine(pr))
 	}
 	return strings.Join(lines, "\n")
