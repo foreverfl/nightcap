@@ -192,10 +192,26 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	}
 }
 
-func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
+func TestRunStopsAtAHeadingThatEndedBlocked(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "false", "max_rounds: 2\n")
+	planFile, err := os.OpenFile("commit-bot.md", os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// a second PR below feed, which must wait while feed is blocked
+	secondPR := strings.Join([]string{
+		"",
+		"## 📄 feat: feed page (feed-page)",
+		"",
+		"- [ ] show it",
+		"  - DONE  go test passes",
+	}, "\n") + "\n"
+	if _, err := planFile.WriteString(secondPR); err != nil {
+		t.Fatal(err)
+	}
+	planFile.Close()
 	var firstStdout, secondStdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run", "commit-bot.md"}, &firstStdout, &stderr); code != 0 {
 		t.Fatalf("first run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
@@ -204,7 +220,7 @@ func TestRunSkipsAHeadingThatEndedBlocked(t *testing.T) {
 		t.Fatalf("second run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	want := strings.Join([]string{
-		"skip feed: blocked",
+		"stop feed: blocked, the headings below wait",
 		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if secondStdout.String() != want {
