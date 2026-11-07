@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,7 +30,7 @@ var DefaultDependencies = []string{
 
 // Load reads <dir>/nightcap.yml, fills missing keys with defaults
 // (max_turns 30, max_rounds 3, lang [ko], merge_method merge, protected and dependencies per target; an empty work_start turns the before-work limit off) and expands a leading "~/" in plan and repo.
-// It returns an error when the file is unreadable or malformed, targets is empty,
+// It returns an error when the file is unreadable or malformed,
 // or a target lacks plan, repo or check.
 func Load(dir string) (Config, error) {
 	raw, err := os.ReadFile(filepath.Join(dir, FileName))
@@ -41,9 +40,6 @@ func Load(dir string) (Config, error) {
 	config := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools, Lang: []string{"ko"}, MergeMethod: "merge"}
 	if err := yaml.Unmarshal(raw, &config); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", FileName, err)
-	}
-	if len(config.Targets) == 0 {
-		return Config{}, errors.New(FileName + ": targets is required")
 	}
 	for i := range config.Targets {
 		target := &config.Targets[i]

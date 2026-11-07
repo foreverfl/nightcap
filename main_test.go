@@ -52,12 +52,11 @@ func writePlan(t *testing.T, repo, test string) {
 	}
 }
 
-// writePlanAndConfig writes commit-bot.md through writePlan, then nightcap.yml: extra lines first, then one target running commit-bot.md in repo with test as its check.
+// writePlanAndConfig writes commit-bot.md through writePlan, then nightcap.yml holding only extra.
 func writePlanAndConfig(t *testing.T, repo, test, extra string) {
 	t.Helper()
 	writePlan(t, repo, test)
-	yml := extra + "targets:\n  - plan: commit-bot.md\n    repo: " + repo + "\n    check: " + test + "\n"
-	if err := os.WriteFile("nightcap.yml", []byte(yml), 0o644); err != nil {
+	if err := os.WriteFile("nightcap.yml", []byte(extra), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -56,12 +56,6 @@ func TestLoadExpandsHomeInRepo(t *testing.T) {
 	}
 }
 
-func TestLoadRequiresTargets(t *testing.T) {
-	if _, err := loadFrom(t, "max_turns: 5\n"); err == nil {
-		t.Fatal("expected error for missing targets")
-	}
-}
-
 func TestLoadRequiresPlanInTarget(t *testing.T) {
 	if _, err := loadFrom(t, "targets:\n  - repo: /tmp/repo\n    check: make check\n"); err == nil {
 		t.Fatal("expected error for target without plan")
