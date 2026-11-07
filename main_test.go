@@ -101,8 +101,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 		"  check: green",
 		"  added lines: 0",
 		"  verdict: green",
-		"  draft PR: https://github.com/foreverfl/feed/pull/1",
-		"  ready: feat/feed",
+		"  PR: https://github.com/foreverfl/feed/pull/1",
 		"  label: nightcap:read-pr",
 	}, "\n") + "\n"
 	if stdout.String() != want {
@@ -282,7 +281,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	createIndex := strings.Index(string(ghCalls), "pr create ")
-	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --draft --base feat/feed ") {
+	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --base feat/feed ") {
 		t.Fatalf("the PR should be opened onto feat/feed, got gh calls:\n%s", ghCalls)
 	}
 }
