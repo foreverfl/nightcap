@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-// oneConfig is the smallest valid nightcap.yml: one target with only the required keys.
-func oneConfig() string {
-	return "targets:\n  - plan: docs/plan.md\n    repo: /tmp/repo\n    check: make check\n"
-}
-
 // loadFrom writes text as nightcap.yml into a fresh temp dir and loads it.
 func loadFrom(t *testing.T, text string) (Config, error) {
 	t.Helper()
@@ -23,20 +18,18 @@ func loadFrom(t *testing.T, text string) (Config, error) {
 }
 
 func TestLoadFillsDefaults(t *testing.T) {
-	got, err := loadFrom(t, oneConfig())
+	got, err := loadFrom(t, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools, Lang: []string{"ko"}, MergeMethod: "merge",
-		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check",
-			Protected: DefaultProtected, Dependencies: DefaultDependencies}}}
+	want := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools, Lang: []string{"ko"}, MergeMethod: "merge"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }
 
 func TestLoadOverridesMaxTurns(t *testing.T) {
-	got, err := loadFrom(t, "max_turns: 5\n"+oneConfig())
+	got, err := loadFrom(t, "max_turns: 5\n")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,25 +38,8 @@ func TestLoadOverridesMaxTurns(t *testing.T) {
 	}
 }
 
-func TestLoadExpandsHomeInRepo(t *testing.T) {
-	got, err := loadFrom(t, "targets:\n  - plan: docs/plan.md\n    repo: ~/repo\n    check: make check\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	home, _ := os.UserHomeDir()
-	if got.Targets[0].Repo != filepath.Join(home, "repo") {
-		t.Fatalf("Repo = %q, want %q", got.Targets[0].Repo, filepath.Join(home, "repo"))
-	}
-}
-
-func TestLoadRequiresPlanInTarget(t *testing.T) {
-	if _, err := loadFrom(t, "targets:\n  - repo: /tmp/repo\n    check: make check\n"); err == nil {
-		t.Fatal("expected error for target without plan")
-	}
-}
-
 func TestLoadReadsLang(t *testing.T) {
-	got, err := loadFrom(t, "lang: [en, ko]\n"+oneConfig())
+	got, err := loadFrom(t, "lang: [en, ko]\n")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +49,7 @@ func TestLoadReadsLang(t *testing.T) {
 }
 
 func TestLoadReadsWorkStart(t *testing.T) {
-	got, err := loadFrom(t, "work_start: \"12:00\"\n"+oneConfig())
+	got, err := loadFrom(t, "work_start: \"12:00\"\n")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,21 +59,11 @@ func TestLoadReadsWorkStart(t *testing.T) {
 }
 
 func TestLoadReadsLimits(t *testing.T) {
-	got, err := loadFrom(t, "limit_session: 80\nlimit_weekly_all: 60\n"+oneConfig())
+	got, err := loadFrom(t, "limit_session: 80\nlimit_weekly_all: 60\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.LimitSession != 80 || got.LimitWeeklyAll != 60 {
 		t.Fatalf("LimitSession, LimitWeeklyAll = %d, %d, want 80, 60", got.LimitSession, got.LimitWeeklyAll)
-	}
-}
-
-func TestLoadReadsProtected(t *testing.T) {
-	got, err := loadFrom(t, oneConfig()+"    protected: [\"*.tsp\", \"*.hurl\"]\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got.Targets[0].Protected, []string{"*.tsp", "*.hurl"}) {
-		t.Fatalf("Protected = %v, want [*.tsp *.hurl]", got.Targets[0].Protected)
 	}
 }

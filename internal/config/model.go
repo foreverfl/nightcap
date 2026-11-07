@@ -1,6 +1,6 @@
 package config
 
-// Config is nightcap.yml in the current folder: shared limits plus one Target per plan file.
+// Config is nightcap.yml in the current folder: the settings every plan shares on this machine.
 type Config struct {
 	MaxTurns       int      `yaml:"max_turns"`
 	MaxRounds      int      `yaml:"max_rounds"`
@@ -11,14 +11,4 @@ type Config struct {
 	Webhook        string   `yaml:"webhook"`          // Discord or Slack webhook URL for the end-of-night message; empty sends nothing
 	Lang           []string `yaml:"lang"`             // PR body languages, e.g. [ko] or [en, ko]
 	MergeMethod    string   `yaml:"merge_method"`     // how a 🤖 PR auto-merges: rebase, otherwise merge
-	Targets        []Target `yaml:"targets"`
-}
-
-// Target pairs one plan file with the repo its units commit to.
-type Target struct {
-	Plan         string   `yaml:"plan"`
-	Repo         string   `yaml:"repo"`
-	Check        string   `yaml:"check"`
-	Protected    []string `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
-	Dependencies []string `yaml:"dependencies"` // dependency file globs the agent may not touch
 }
