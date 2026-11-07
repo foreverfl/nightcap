@@ -18,6 +18,7 @@ limit_session: 80          # 5시간 창 %가 이 위면 새 유닛을 안 연�
 limit_weekly_all: 80       # 주간 %가 이 위면 새 유닛을 안 연다. 리셋 24시간 안이면 무시
 max_turns: 30
 max_rounds: 3
+webhook: https://discord.com/api/webhooks/…   # Discord나 Slack(hooks.slack.com). 밤이 끝나면 메시지 하나, 비우면 안 보낸다
 targets:
   - plan: ~/work/todolist/blog-v2/github-rank-commit.md
     repo: ~/workspace/apps-web/blog-v2

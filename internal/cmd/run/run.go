@@ -16,6 +16,7 @@ import (
 	"nightcap/internal/client/claude"
 	"nightcap/internal/config"
 	"nightcap/internal/git"
+	"nightcap/internal/notify"
 	"nightcap/internal/plan"
 	"nightcap/internal/pr"
 	"nightcap/internal/state"
@@ -36,6 +37,7 @@ func Run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	defer sendNightSummary(loaded, time.Now())
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
@@ -389,4 +391,16 @@ func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod
 		fmt.Fprintf(stdout, "  auto-merge: %s\n", branch)
 	}
 	return nil
+}
+
+// sendNightSummary sends one line with the target repos and the start and end times; a failed send only prints to stderr.
+func sendNightSummary(loaded config.Config, started time.Time) {
+	var repos []string
+	for _, target := range loaded.Targets {
+		repos = append(repos, filepath.Base(target.Repo))
+	}
+	text := fmt.Sprintf("nightcap %s · %s → %s", strings.Join(repos, ", "), started.Format("15:04"), time.Now().Format("15:04"))
+	if err := notify.Send(loaded.Webhook, text); err != nil {
+		fmt.Fprintln(os.Stderr, "notify:", err)
+	}
 }

@@ -8,6 +8,7 @@ type Config struct {
 	LimitSession   int      `yaml:"limit_session"`    // 5h window % above which no new unit starts; 0 means no cap
 	LimitWeeklyAll int      `yaml:"limit_weekly_all"` // weekly all-models % above which no new unit starts; 0 means no cap
 	AllowedTools   []string `yaml:"allowed_tools"`    // claude --allowedTools; read, edit, and only local commands
+	Webhook        string   `yaml:"webhook"`          // Discord or Slack webhook URL for the end-of-night message; empty sends nothing
 	Targets        []Target `yaml:"targets"`
 }
 
