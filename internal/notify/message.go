@@ -14,6 +14,7 @@ type Summary struct {
 	Start, End time.Time
 	Usage      []UsageLine // empty when no unit ran or /usage could not be read
 	PRs        []PR        // one per plan heading the night worked on, in plan order
+	StopReason string      // why the run stopped early, such as "session 85% ≥ 80"; empty when it ran to the end
 }
 
 // PR is one plan heading, which is one PR, at the end of the night.
@@ -32,7 +33,7 @@ type UsageLine struct {
 }
 
 // Message builds the end-of-night message: the repos and times, one indented line per usage limit,
-// then after a blank line one line per PR.
+// then after a blank line one line per PR, and after another blank line why the run stopped, when it stopped early.
 func Message(summary Summary) string {
 	lines := []string{fmt.Sprintf("🌙 nightcap %s · %s → %s", strings.Join(summary.Repos, ", "), summary.Start.Format("15:04"), summary.End.Format("15:04"))}
 	for _, limit := range summary.Usage {
@@ -43,6 +44,9 @@ func Message(summary Summary) string {
 	}
 	for _, pr := range summary.PRs {
 		lines = append(lines, prLine(pr))
+	}
+	if summary.StopReason != "" {
+		lines = append(lines, "", "stopped: "+summary.StopReason)
 	}
 	return strings.Join(lines, "\n")
 }

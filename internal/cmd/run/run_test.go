@@ -130,3 +130,26 @@ func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
 }
+
+func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	started := time.Date(2026, 11, 8, 23, 0, 0, 0, time.UTC)
+	section := plan.Section{Slug: "feed-hurl", Units: []plan.Unit{{Title: "list feeds"}}}
+	for _, tc := range []struct {
+		updatedAt time.Time
+		want      string
+	}{
+		{started.Add(time.Hour), "session 85% ≥ 80"},
+		{started.Add(-24 * time.Hour), ""},
+	} {
+		saved := state.State{Sections: map[string]state.Section{"feed-hurl": {Units: map[string]state.Unit{
+			"list feeds": {Result: "stopped", Reason: "session 85% ≥ 80", UpdatedAt: tc.updatedAt},
+		}}}}
+		if err := state.Save(statePath, saved); err != nil {
+			t.Fatal(err)
+		}
+		if got := stopReason(statePath, section, started); got != tc.want {
+			t.Fatalf("stopped at %v: got %q, want %q", tc.updatedAt, got, tc.want)
+		}
+	}
+}

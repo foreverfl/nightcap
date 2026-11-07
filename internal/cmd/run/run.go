@@ -412,6 +412,7 @@ func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath
 		} else {
 			summary.PRs = []notify.PR{prResult}
 		}
+		summary.StopReason = stopReason(statePath, *pickedSection, started)
 	}
 	if startUsage.Known {
 		usageJSON, _ := claude.Usage(ctx)
@@ -450,4 +451,16 @@ func prSummary(statePath string, section plan.Section) (notify.PR, error) {
 		}
 	}
 	return prResult, nil
+}
+
+// stopReason returns the reason of a unit of section that the state file at statePath saved as stopped after started,
+// so a stop from an earlier night is not reported again; it returns "" when there is none or the file cannot be read.
+func stopReason(statePath string, section plan.Section, started time.Time) string {
+	saved, _ := state.Load(statePath)
+	for _, unit := range saved.Sections[section.Slug].Units {
+		if unit.Result == "stopped" && unit.UpdatedAt.After(started) {
+			return unit.Reason
+		}
+	}
+	return ""
 }

@@ -54,3 +54,16 @@ func TestMessageDrawsOneLinePerPR(t *testing.T) {
 		t.Fatalf("got\n%s\nwant\n%s", got, want)
 	}
 }
+
+func TestMessageEndsWithTheStopReason(t *testing.T) {
+	summary := oneSummary()
+	summary.StopReason = "session 85% ≥ 80"
+	want := strings.Join([]string{
+		"🌙 nightcap blog-v2 · 23:05 → 03:40",
+		"",
+		"stopped: session 85% ≥ 80",
+	}, "\n")
+	if got := Message(summary); got != want {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
+	}
+}
