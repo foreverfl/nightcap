@@ -233,6 +233,22 @@ func TestRunWithoutAPlanFileFails(t *testing.T) {
 	}
 }
 
+func TestStatusPrintsTheFrontmatterRepo(t *testing.T) {
+	repo := setUpRepoWithOneUnitPlan(t)
+	var stdout, stderr bytes.Buffer
+	// each worktree line is git worktree list's own "<path>  <commit> [main]"
+	if code := dispatch([]string{"status", "commit-bot.md"}, &stdout, &stderr); code != 0 || !strings.HasPrefix(stdout.String(), repo+"\n") || !strings.Contains(stdout.String(), "[main]") {
+		t.Fatalf("want the repo line, then its main worktree; got %d %q %q", code, stdout.String(), stderr.String())
+	}
+}
+
+func TestStatusWithoutAPlanFileFails(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"status"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "status: name a plan file") {
+		t.Fatalf("want exit 1 and status: name a plan file, got %d %q", code, stderr.String())
+	}
+}
+
 func TestRunWithoutRepoInTheFrontmatterFails(t *testing.T) {
 	t.Chdir(t.TempDir())
 	planText := strings.Join([]string{
