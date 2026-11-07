@@ -85,9 +85,9 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 
 	statePath := filepath.Join(repo, ".nightcap", "state.json")
 	loaded := config.Config{MaxRounds: 3}
-	target := config.Target{Repo: repo, Check: "true"}
+	meta := plan.Meta{Repo: repo, Test: "true"}
 	unit := plan.Unit{Title: "add it"}
-	if err := runUnit(context.Background(), io.Discard, loaded, target, repo, "main", "feed", 1, unit, statePath); err != nil {
+	if err := runUnit(context.Background(), io.Discard, loaded, meta, repo, "main", "feed", 1, unit, statePath); err != nil {
 		t.Fatal(err)
 	}
 	saved, _ := state.Load(statePath)

@@ -125,7 +125,8 @@ func Run(args []string, stdout io.Writer) error {
 				fmt.Fprintf(stdout, "  stop: %s\n", reason)
 				return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
 			}
-			if err := runUnit(ctx, stdout, loaded, target, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
+			meta := plan.Meta{Repo: target.Repo, Test: target.Check, Protected: target.Protected, Dependencies: target.Dependencies}
+			if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
 			if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
@@ -144,13 +145,13 @@ func Run(args []string, stdout io.Writer) error {
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
 // or claude stops before Done. Every round's outcome goes into the state file at statePath.
 // It returns an error only when claude, sh, git or the state file fails.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target config.Target, worktreeDir, base, slug string, number int, unit plan.Unit, statePath string) error {
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Unit, statePath string) error {
 	failureTail := ""
 	sessionID := ""
 	record := state.Unit{}
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
-		logPath := filepath.Join(target.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
+		logPath := filepath.Join(meta.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
 		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(unit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
 			return err
@@ -180,7 +181,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 			break
 		}
 		// 1. Check: run the check command from nightcap.yml (tests pass or not)
-		checked, err := check.Run(ctx, worktreeDir, target.Check)
+		checked, err := check.Run(ctx, worktreeDir, meta.Test)
 		if err != nil {
 			return err
 		}
@@ -189,7 +190,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, target
 		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
 		if checked.Green {
-			verdict, err := classifyBranch(stdout, worktreeDir, base, target, unit)
+			verdict, err := classifyBranch(stdout, worktreeDir, base, meta, unit)
 			if err != nil {
 				return err
 			}
@@ -266,7 +267,7 @@ func color(green bool) string {
 
 // classifyBranch prints the files and the count of lines worktreeDir's branch changed, then the verdict on them.
 // It returns that verdict, or an error when git fails.
-func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Target, unit plan.Unit) (check.Verdict, error) {
+func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, unit plan.Unit) (check.Verdict, error) {
 	changes, err := git.ChangedFiles(worktreeDir, base)
 	if err != nil {
 		return check.Verdict{}, err
@@ -279,7 +280,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Ta
 		return check.Verdict{}, err
 	}
 	fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
-	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), target.Protected, target.Dependencies)
+	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), meta.Protected, meta.Dependencies)
 	if verdict.Red {
 		fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
 	} else if verdict.ReadCode {
