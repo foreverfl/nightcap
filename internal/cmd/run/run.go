@@ -52,9 +52,10 @@ func Run(args []string, stdout io.Writer) error {
 	defer stop()
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
-	defer func() { sendNightSummary(ctx, loaded, meta.Repo, started, startUsage) }()
-
 	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
+	var pickedSection *plan.Section // the heading tonight took; nil when there was none
+	defer func() { sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedSection, started, startUsage) }()
+
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -102,6 +103,7 @@ func Run(args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "%s: nothing to take\n", planPath)
 		return nil
 	}
+	pickedSection = &section
 	base := baseFor[section.Slug]
 	branch := section.Type + "/" + section.Slug
 	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, section.Slug)
@@ -399,19 +401,66 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	return nil
 }
 
-// sendNightSummary sends the morning message: the repo, the times and, when a unit ran, the usage. A failed send only prints to stderr.
-func sendNightSummary(ctx context.Context, loaded config.Config, repo string, started time.Time, startUsage usage.Usage) {
-	night := notify.Night{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
+// sendNightSummary sends the morning message: the repo, the times, when a unit ran the usage, and the picked heading's line
+// read from the state file at statePath. A failed send or an unreadable state file only prints to stderr.
+func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedSection *plan.Section, started time.Time, startUsage usage.Usage) {
+	summary := notify.Summary{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
+	if pickedSection != nil {
+		prResult, err := prSummary(statePath, *pickedSection)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "notify:", err)
+		} else {
+			summary.PRs = []notify.PR{prResult}
+		}
+		summary.StopReason = stopReason(statePath, *pickedSection, started)
+	}
 	if startUsage.Known {
 		usageJSON, _ := claude.Usage(ctx)
 		if endUsage, _ := usage.Read(usageJSON); endUsage.Known {
-			night.Usage = []notify.UsageLine{
+			summary.Usage = []notify.UsageLine{
 				{Name: "session", Start: startUsage.Session.Percent, End: endUsage.Session.Percent},
 				{Name: "weekly", Start: startUsage.WeeklyAll.Percent, End: endUsage.WeeklyAll.Percent},
 			}
 		}
 	}
-	if err := notify.Send(loaded.Webhook, notify.Message(night)); err != nil {
+	if err := notify.Send(loaded.Webhook, notify.Message(summary)); err != nil {
 		fmt.Fprintln(os.Stderr, "notify:", err)
 	}
+}
+
+// prSummary reads how section's units ended in the state file at statePath: green and read-code count as done,
+// and the first other result is the failure word. It returns an error when the state file cannot be read.
+func prSummary(statePath string, section plan.Section) (notify.PR, error) {
+	saved, err := state.Load(statePath)
+	if err != nil {
+		return notify.PR{}, err
+	}
+	sectionState := saved.Sections[section.Slug]
+	prResult := notify.PR{
+		Mark:  section.Mark,
+		Title: fmt.Sprintf("%s: %s (%s)", section.Type, section.Title, section.Slug),
+		Total: len(section.Units),
+		URL:   sectionState.PRURL,
+	}
+	for _, unit := range section.Units {
+		result := sectionState.Units[unit.Title].Result
+		if result == "green" || result == "read-code" {
+			prResult.Done++
+		} else if result != "" && prResult.Failure == "" {
+			prResult.Failure = result
+		}
+	}
+	return prResult, nil
+}
+
+// stopReason returns the reason of a unit of section that the state file at statePath saved as stopped after started,
+// so a stop from an earlier night is not reported again; it returns "" when there is none or the file cannot be read.
+func stopReason(statePath string, section plan.Section, started time.Time) string {
+	saved, _ := state.Load(statePath)
+	for _, unit := range saved.Sections[section.Slug].Units {
+		if unit.Result == "stopped" && unit.UpdatedAt.After(started) {
+			return unit.Reason
+		}
+	}
+	return ""
 }

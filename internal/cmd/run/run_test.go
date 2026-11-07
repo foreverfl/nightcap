@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"nightcap/internal/config"
+	"nightcap/internal/notify"
 	"nightcap/internal/plan"
 	"nightcap/internal/state"
 	"nightcap/internal/usage"
@@ -107,5 +108,48 @@ func TestBuildPromptLeavesTheRulesOutOfAResumedSession(t *testing.T) {
 	}
 	if strings.Contains(BuildPrompt("add it", "FAIL", true), unitRules) {
 		t.Fatal("a resumed session already has the unit rules")
+	}
+}
+
+func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	if err := state.SaveUnit(statePath, "feed-hurl", "list feeds", state.Unit{Result: "green"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SavePRStatus(statePath, "feed-hurl", "https://github.com/foreverfl/blog-v2/pull/41", "OPEN"); err != nil {
+		t.Fatal(err)
+	}
+	section := plan.Section{Mark: plan.MarkAuto, Type: "test", Title: "피드 hurl 파일", Slug: "feed-hurl",
+		Units: []plan.Unit{{Title: "list feeds"}, {Title: "add a feed"}, {Title: "delete a feed"}}}
+	got, err := prSummary(statePath, section)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := notify.PR{Mark: plan.MarkAuto, Title: "test: 피드 hurl 파일 (feed-hurl)", Done: 1, Total: 3, URL: "https://github.com/foreverfl/blog-v2/pull/41"}
+	if got != want {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	started := time.Date(2026, 11, 8, 23, 0, 0, 0, time.UTC)
+	section := plan.Section{Slug: "feed-hurl", Units: []plan.Unit{{Title: "list feeds"}}}
+	for _, tc := range []struct {
+		updatedAt time.Time
+		want      string
+	}{
+		{started.Add(time.Hour), "session 85% ≥ 80"},
+		{started.Add(-24 * time.Hour), ""},
+	} {
+		saved := state.State{Sections: map[string]state.Section{"feed-hurl": {Units: map[string]state.Unit{
+			"list feeds": {Result: "stopped", Reason: "session 85% ≥ 80", UpdatedAt: tc.updatedAt},
+		}}}}
+		if err := state.Save(statePath, saved); err != nil {
+			t.Fatal(err)
+		}
+		if got := stopReason(statePath, section, started); got != tc.want {
+			t.Fatalf("stopped at %v: got %q, want %q", tc.updatedAt, got, tc.want)
+		}
 	}
 }

@@ -10,6 +10,16 @@ const (
 	MarkPerson Mark = "person"  // 👤 a person does this PR by hand
 )
 
+// Emoji returns the mark as a plan writes it, such as "🤖"; MarkNone returns "".
+func (mark Mark) Emoji() string {
+	for emoji, known := range marks {
+		if known == mark {
+			return emoji
+		}
+	}
+	return ""
+}
+
 // Section is one "## mark type: title (slug)" heading; it becomes one branch and one PR.
 type Section struct {
 	Mark    Mark
