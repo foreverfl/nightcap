@@ -5,13 +5,19 @@ nightcap은 항목마다 마크다운 파일 하나를 읽는다. 전체 예시�
 ## 제목 = PR 하나
 
 ```markdown
-## feat: 메모 목록과 추가 (notes-api)
+## 📄 feat: 메모 목록과 추가 (notes-api)
 
 HTTP로 메모를 보고 더할 수 있게 해서, 웹 화면이 부를 곳을 만든다.
 ```
 
-- 제목은 `## type: 제목 (slug)` 꼴이다. `###`도 같게 읽지만 `##`가 기본이다.
-- `👤`로 시작하는 제목(`## 👤 feat: …`)은 사람이 손으로 하는 PR이다. nightcap은 그 제목을 읽지 않고, 고르지도 않는다.
+- 제목은 `## 표시 type: 제목 (slug)` 꼴이다. `###`도 같게 읽지만 `##`가 기본이다.
+- 표시는 합치기 전에 사람이 얼마나 읽을지다. PR 라벨은 표시 그대로 붙는다:
+  - `🤖`: `nightcap:auto`. GitHub auto-merge를 켜서, 필수 검사가 초록이 되면 사람 없이 합쳐진다. 계약 · 테스트 파일만 더하는 PR
+  - `📄`: `nightcap:read-pr`. 본문과 위험 목록만 보면 된다
+  - `👀`: `nightcap:read-code`. diff까지 읽는다
+  - `👤`: 사람이 손으로 하는 PR. nightcap은 고르지 않는다
+- 밤에 걸린 것(WHERE 밖 · read_code 경로 · 마이그레이션)은 라벨이 아니라 위험 목록에 적힌다.
+- 표시가 없는 제목은 건너뛰고, `nightcap lint`가 `no mark:`로 찍는다.
 - `type`은 `feat` · `fix` · `test` · `docs` · `refactor` · `chore` 중 하나다.
 - 브랜치는 `type/slug`, PR 제목은 `type: 제목`이 된다.
 - 제목 밑 첫 일반 문장이 PR 본문의 첫 문장이 된다.
