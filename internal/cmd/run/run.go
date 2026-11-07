@@ -75,8 +75,8 @@ func Run(args []string, stdout io.Writer) error {
 		previousOpenBranch = ""
 		previousOpenURL = ""
 		if state.IsBlocked(saved.Sections[section.Slug]) {
-			fmt.Fprintf(stdout, "skip %s: blocked\n", section.Title)
-			continue
+			fmt.Fprintf(stdout, "stop %s: blocked, the headings below wait\n", section.Title)
+			break // plans are written top to bottom, so a heading below stands on this one
 		}
 		if len(section.Units) > 0 {
 			view, err := pr.ViewBranch(meta.Repo, section.Type+"/"+section.Slug)
