@@ -40,17 +40,9 @@ func Run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if meta.Repo == "" {
-		return errors.New("run: the plan's frontmatter needs repo")
-	}
-	if meta.Test == "" {
-		meta.Test = "make check"
-	}
-	if len(meta.Protected) == 0 {
-		meta.Protected = config.DefaultProtected
-	}
-	if len(meta.Dependencies) == 0 {
-		meta.Dependencies = config.DefaultDependencies
+	// a key left out reads as nil, while "protected: []" is an empty list that means none
+	if meta.Repo == "" || meta.Test == "" || meta.Protected == nil || meta.Dependencies == nil {
+		return errors.New("run: the plan's frontmatter needs repo, test, protected and dependencies")
 	}
 	loaded, err := config.Load(".")
 	if err != nil {

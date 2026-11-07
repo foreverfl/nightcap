@@ -33,13 +33,15 @@ func setUpRepoWithOneUnitPlan(t *testing.T) string {
 	return repo
 }
 
-// writePlan writes commit-bot.md: a frontmatter naming repo and the test command, then one heading with one unit.
+// writePlan writes commit-bot.md: a frontmatter naming repo, the test command and the protected and dependency files, then one heading with one unit.
 func writePlan(t *testing.T, repo, test string) {
 	t.Helper()
 	planText := strings.Join([]string{
 		"---",
 		"repo: " + repo,
 		"test: " + test,
+		`protected: ["*_test.go"]`,
+		"dependencies: [go.mod, go.sum]",
 		"---",
 		"",
 		"## 📄 feat: feed (feed)",
@@ -249,19 +251,22 @@ func TestStatusWithoutAPlanFileFails(t *testing.T) {
 	}
 }
 
-func TestRunWithoutRepoInTheFrontmatterFails(t *testing.T) {
+func TestRunWithoutProtectedInTheFrontmatterFails(t *testing.T) {
 	t.Chdir(t.TempDir())
 	planText := strings.Join([]string{
 		"---",
+		"repo: /tmp/repo",
 		"test: true",
+		"dependencies: []",
 		"---",
 	}, "\n") + "\n"
 	if err := os.WriteFile("commit-bot.md", []byte(planText), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "run: the plan's frontmatter needs repo") {
-		t.Fatalf("want exit 1 and the frontmatter needs repo, got %d %q", code, stderr.String())
+	want := "run: the plan's frontmatter needs repo, test, protected and dependencies"
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), want) {
+		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stderr.String())
 	}
 }
 
@@ -272,6 +277,8 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 		"---",
 		"repo: " + repo,
 		"test: true",
+		"protected: []",
+		"dependencies: []",
 		"---",
 		"",
 		"## 📄 feat: feed (feed)",

@@ -17,16 +17,6 @@ var defaultAllowedTools = []string{
 	"Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)",
 }
 
-// DefaultProtected are the contract files a plan gets when its frontmatter names none.
-var DefaultProtected = []string{"*_test.go", "*.hurl", "openapi/*", "Makefile"}
-
-// DefaultDependencies are the dependency files a plan gets when its frontmatter names none.
-var DefaultDependencies = []string{
-	"go.mod", "go.sum",
-	"Cargo.toml", "Cargo.lock",
-	"package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
-}
-
 // Load reads <dir>/nightcap.yml, fills missing keys with defaults
 // (max_turns 30, max_rounds 3, lang [ko], merge_method merge; an empty work_start turns the before-work limit off).
 // It returns an error when the file is unreadable or malformed.
