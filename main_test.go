@@ -29,7 +29,7 @@ func setUpRepoWithOneUnitPlan(t *testing.T) string {
 		}
 	}
 	planText := []byte(strings.Join([]string{
-		"## feat: feed (feed)",
+		"## 📄 feat: feed (feed)",
 		"",
 		"- [ ] add it",
 		"  - DONE  go test passes",
@@ -256,12 +256,12 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	repo := setUpRepoWithOneUnitPlan(t)
 	useFakeClaude(t)
 	planText := []byte(strings.Join([]string{
-		"## feat: feed (feed)",
+		"## 📄 feat: feed (feed)",
 		"",
 		"- [ ] add it",
 		"  - DONE  go test passes",
 		"",
-		"## feat: feed page (feed-page)",
+		"## 📄 feat: feed page (feed-page)",
 		"",
 		"- [ ] show it",
 		"  - DONE  go test passes",
@@ -289,7 +289,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 
 // oneLintPlan is the smallest plan lint passes: one typed heading with one unit that has a check.
 func oneLintPlan() string {
-	return "## feat: a (b)\n" +
+	return "## 📄 feat: a (b)\n" +
 		"- [ ] read the docs\n" +
 		"  - DONE  go test ./... passes\n"
 }
@@ -307,7 +307,7 @@ func runLint(t *testing.T, plan string) (int, string) {
 }
 
 func TestLintPlanWithoutTypedHeadingExits1(t *testing.T) {
-	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## feat: a (b)", "## cmd", 1))
+	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## 📄 feat: a (b)", "## cmd", 1))
 	if code != 1 || stdout != "no heading with type: slug\n" {
 		t.Fatalf("want exit 1 and the no-heading line, got %d %q", code, stdout)
 	}
@@ -322,9 +322,16 @@ func TestLintUnitWithoutCheckExits1(t *testing.T) {
 }
 
 func TestLintPrintsAPersonHeadingAsPerson(t *testing.T) {
-	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## feat:", "## 👤 feat:", 1))
+	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## 📄 feat:", "## 👤 feat:", 1))
 	if code != 0 || stdout != "person: feat: a (b)\n" {
 		t.Fatalf("want exit 0 and %q, got %d %q", "person: feat: a (b)\n", code, stdout)
+	}
+}
+
+func TestLintHeadingWithoutAMarkExits1(t *testing.T) {
+	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "📄 ", "", 1))
+	if code != 1 || stdout != "no mark: feat: a (b)\n" {
+		t.Fatalf("want exit 1 and %q, got %d %q", "no mark: feat: a (b)\n", code, stdout)
 	}
 }
 

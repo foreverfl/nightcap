@@ -124,7 +124,7 @@ func Run(args []string, stdout io.Writer) error {
 			if err := openDraftPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
 				return err
 			}
-			if err := markReadyWhenFinished(stdout, statePath, worktreeDir, section); err != nil {
+			if err := markReadyWhenFinished(stdout, statePath, worktreeDir, target.MergeMethod, section); err != nil {
 				return err
 			}
 			break
@@ -272,7 +272,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Ta
 		return check.Verdict{}, err
 	}
 	fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
-	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), target.ReadCode)
+	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), target.ReadCode, target.Protected, target.Dependencies)
 	if verdict.Red {
 		fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
 	} else if verdict.ReadCode {
@@ -360,30 +360,33 @@ func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle s
 	return input
 }
 
-// markReadyWhenFinished turns section's draft PR ready for review once every unit of section has ended green or
-// read-code in the state file at statePath, then labels it read-pr or read-code. It returns an error when the state file or gh fails.
-func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir string, section plan.Section) error {
+// markReadyWhenFinished marks the PR ready when every unit is done, adds the label the heading's mark names, and turns on auto-merge for 🤖.
+func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, section plan.Section) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
 	}
-	var unitResults []string
 	for _, unit := range section.Units {
 		result := saved.Sections[section.Slug].Units[unit.Title].Result
 		if result != "green" && result != "read-code" {
 			return nil
 		}
-		unitResults = append(unitResults, result)
 	}
 	branch := section.Type + "/" + section.Slug
 	if err := pr.MarkReady(worktreeDir, branch); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "  ready: %s\n", branch)
-	label := pr.ReadingLabel(unitResults)
+	label := pr.ReadingLabel(section.Mark)
 	if err := pr.AddLabel(worktreeDir, branch, label); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "  label: %s\n", label)
+	if section.Mark == plan.MarkAuto {
+		if err := pr.EnableAutoMerge(worktreeDir, branch, mergeMethod); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "  auto-merge: %s\n", branch)
+	}
 	return nil
 }

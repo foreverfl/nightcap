@@ -1,6 +1,6 @@
 # notes app — commits
 
-## feat: list and add notes (notes-api)
+## 📄 feat: list and add notes (notes-api)
 
 Notes can be listed and added over HTTP, so the web page has something to call.
 

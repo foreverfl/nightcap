@@ -28,7 +28,8 @@ func TestLoadFillsDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Config{MaxTurns: 30, MaxRounds: 3, AllowedTools: defaultAllowedTools,
-		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check", Lang: []string{"ko"}}}}
+		Targets: []Target{{Plan: "docs/plan.md", Repo: "/tmp/repo", Check: "make check", Lang: []string{"ko"}, MergeMethod: "merge",
+			Protected: defaultProtected, Dependencies: defaultDependencies}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
@@ -94,5 +95,15 @@ func TestLoadReadsLimits(t *testing.T) {
 	}
 	if got.LimitSession != 80 || got.LimitWeeklyAll != 60 {
 		t.Fatalf("LimitSession, LimitWeeklyAll = %d, %d, want 80, 60", got.LimitSession, got.LimitWeeklyAll)
+	}
+}
+
+func TestLoadReadsProtected(t *testing.T) {
+	got, err := loadFrom(t, oneConfig()+"    protected: [\"*.tsp\", \"*.hurl\"]\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got.Targets[0].Protected, []string{"*.tsp", "*.hurl"}) {
+		t.Fatalf("Protected = %v, want [*.tsp *.hurl]", got.Targets[0].Protected)
 	}
 }

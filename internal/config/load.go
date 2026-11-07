@@ -19,8 +19,18 @@ var defaultAllowedTools = []string{
 	"Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)",
 }
 
+// defaultProtected are the contract files a target gets when nightcap.yml names none.
+var defaultProtected = []string{"*_test.go", "*.hurl", "openapi/*", "Makefile"}
+
+// defaultDependencies are the dependency files a target gets when nightcap.yml names none.
+var defaultDependencies = []string{
+	"go.mod", "go.sum",
+	"Cargo.toml", "Cargo.lock",
+	"package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
+}
+
 // Load reads <dir>/nightcap.yml, fills missing keys with defaults
-// (max_turns 30, max_rounds 3, lang [ko] per target; an empty work_start turns the before-work limit off) and expands a leading "~/" in plan and repo.
+// (max_turns 30, max_rounds 3, lang [ko], merge_method merge, protected and dependencies per target; an empty work_start turns the before-work limit off) and expands a leading "~/" in plan and repo.
 // It returns an error when the file is unreadable or malformed, targets is empty,
 // or a target lacks plan, repo or check.
 func Load(dir string) (Config, error) {
@@ -44,6 +54,15 @@ func Load(dir string) (Config, error) {
 		target.Repo = expandHome(target.Repo)
 		if len(target.Lang) == 0 {
 			target.Lang = []string{"ko"}
+		}
+		if target.MergeMethod == "" {
+			target.MergeMethod = "merge"
+		}
+		if len(target.Protected) == 0 {
+			target.Protected = defaultProtected
+		}
+		if len(target.Dependencies) == 0 {
+			target.Dependencies = defaultDependencies
 		}
 	}
 	return config, nil

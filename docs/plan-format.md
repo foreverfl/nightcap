@@ -5,13 +5,19 @@ nightcap reads one markdown file per target. See `examples/plan.md` for a full o
 ## Heading = one PR
 
 ```markdown
-## feat: list and add notes (notes-api)
+## 📄 feat: list and add notes (notes-api)
 
 Notes can be listed and added over HTTP, so the web page has something to call.
 ```
 
-- The heading is `## type: title (slug)`. A `###` heading is read the same way, but `##` is the convention.
-- A heading that starts with `👤` (`## 👤 feat: …`) is a PR a person does by hand. nightcap does not read it and never picks it.
+- The heading is `## mark type: title (slug)`. A `###` heading is read the same way, but `##` is the convention.
+- The mark says how much a person reads before merging, and the PR label follows it as written:
+  - `🤖`: `nightcap:auto`. GitHub auto-merge is turned on, so the PR merges once the required checks pass. For PRs that only add contract and test files
+  - `📄`: `nightcap:read-pr`. The body and the risk list are enough
+  - `👀`: `nightcap:read-code`. Read the diff
+  - `👤`: a person does this PR by hand. nightcap never picks it
+- What nightcap notices at night (outside WHERE, a read_code path, a migration) goes into the risk list, never into the label.
+- A heading without a mark is skipped, and `nightcap lint` prints it as `no mark:`.
 - `type` is one of `feat`, `fix`, `test`, `docs`, `refactor`, `chore`.
 - The branch is `type/slug` and the PR title is `type: title`.
 - The first plain line under the heading becomes the first sentence of the PR body.

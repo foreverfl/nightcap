@@ -11,7 +11,7 @@ import (
 	"nightcap/internal/plan"
 )
 
-// Run is the "lint" subcommand; args[0] is the plan file. It prints every heading a night run can read, each 👤 heading as person,
+// Run is the "lint" subcommand; args[0] is the plan file. It prints every heading a night run can read, each 👤 heading as person, each heading without a reading mark as no mark,
 // every open unit whose DONE names no check, and every WHERE path the run cannot read inside the repo,
 // and returns an error when any of those is found or the file cannot be read.
 func Run(args []string, stdout io.Writer) error {
@@ -29,8 +29,13 @@ func Run(args []string, stdout io.Writer) error {
 	}
 	hasProblem := false
 	for _, section := range sections {
-		if section.IsPerson {
+		if section.IsPerson() {
 			fmt.Fprintf(stdout, "person: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
+			continue
+		}
+		if section.Mark == plan.MarkNone {
+			fmt.Fprintf(stdout, "no mark: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
+			hasProblem = true
 			continue
 		}
 		fmt.Fprintf(stdout, "heading: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
