@@ -10,21 +10,23 @@ Runs Claude Code overnight against one heading of a plan file, one unit at a tim
 
 Plan files follow [docs/plan-format.md](docs/plan-format.md); copy [examples/plan.md](examples/plan.md) to start.
 
-Write `nightcap.yml` next to the binary (it is gitignored) and run `nightcap run` from that folder. One target per plan file:
+Put this at the top of your plan file. All four keys are required; write `[]` for a list you want empty:
 
 ```yaml
-work_start: "09:00"        # leave empty for no before-work limit; when set, no new usage window opens within 5h of it
-limit_session: 80          # no new unit starts while the 5h window is above this %
-limit_weekly_all: 80       # no new unit starts while the weekly % is above this; ignored within 24h of its reset
-max_turns: 30
-max_rounds: 3
-webhook: https://discord.com/api/webhooks/…   # Discord or Slack (hooks.slack.com); one message when the night ends, empty for none
-targets:
-  - plan: ~/work/todolist/blog-v2/github-rank-commit.md
-    repo: ~/workspace/apps-web/blog-v2
-    check: make check
-    lang: [en, ko]            # PR body languages, default [ko]
-    merge_method: rebase      # how a 🤖 PR auto-merges: rebase, otherwise merge. default merge
+---
+repo: ~/workspace/apps-web/blog-v2
+test: make check                                         # the check every unit must pass
+protected: ["*.tsp", "*.hurl", "*_test.go", "Makefile"]  # contract files the agent may add but not edit or delete
+dependencies: [go.mod, go.sum]                           # dependency files the agent may not touch
+---
+```
+
+Copy [examples/nightcap.yml](examples/nightcap.yml) next to the binary as `nightcap.yml` (it is gitignored). It holds the settings every plan shares on this machine.
+
+Then run it from that folder with the plan file:
+
+```sh
+nightcap run ~/work/todolist/blog-v2/commit-bot.md
 ```
 
 Before the first 🤖 heading, turn auto-merge on in the repo once. With `merge_method: rebase`, allow rebase merges too:

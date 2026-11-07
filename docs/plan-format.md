@@ -1,6 +1,6 @@
 # Plan format
 
-nightcap reads one markdown file per target. See `examples/plan.md` for a full one.
+nightcap reads the one markdown file you pass to `nightcap run`. It starts with a frontmatter naming repo, test, protected and dependencies, as the README shows. See `examples/plan.md` for a full one.
 
 ## Heading = one PR
 

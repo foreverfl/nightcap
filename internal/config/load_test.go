@@ -67,3 +67,13 @@ func TestLoadReadsLimits(t *testing.T) {
 		t.Fatalf("LimitSession, LimitWeeklyAll = %d, %d, want 80, 60", got.LimitSession, got.LimitWeeklyAll)
 	}
 }
+
+func TestLoadReadsTheExample(t *testing.T) {
+	got, err := Load("../../examples")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.MergeMethod != "rebase" || !reflect.DeepEqual(got.Lang, []string{"en", "ko"}) {
+		t.Fatalf("got MergeMethod %q, Lang %v; want rebase, [en ko]", got.MergeMethod, got.Lang)
+	}
+}

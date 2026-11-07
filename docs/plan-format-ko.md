@@ -1,6 +1,6 @@
 # 계획 형식
 
-nightcap은 항목마다 마크다운 파일 하나를 읽는다. 전체 예시는 `examples/plan-ko.md`.
+nightcap은 `nightcap run`에 준 마크다운 파일 하나를 읽는다. 파일 맨 위 프론트매터가 repo · test · protected · dependencies를 말한다(README 참고). 전체 예시는 `examples/plan-ko.md`.
 
 ## 제목 = PR 하나
 
