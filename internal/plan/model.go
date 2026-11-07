@@ -4,11 +4,10 @@ package plan
 type Mark string
 
 const (
-	MarkNone     Mark = ""          // no mark yet, so a night run skips the heading and lint reports it
-	MarkAuto     Mark = "auto"      // 🤖 merged without a person
-	MarkReadPR   Mark = "read-pr"   // 📄 merged after reading the PR
-	MarkReadCode Mark = "read-code" // 👀 merged after reading the code
-	MarkPerson   Mark = "person"    // 👤 a person does this PR by hand
+	MarkNone   Mark = ""        // no mark yet, so a night run skips the heading and lint reports it
+	MarkAuto   Mark = "auto"    // 🤖 merged without a person
+	MarkReadPR Mark = "read-pr" // 📄 merged after reading the PR
+	MarkPerson Mark = "person"  // 👤 a person does this PR by hand
 )
 
 // Section is one "## mark type: title (slug)" heading; it becomes one branch and one PR.

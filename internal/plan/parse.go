@@ -8,7 +8,7 @@ import (
 var sectionTypes = []string{"feat", "fix", "test", "docs", "refactor", "chore"}
 
 // marks maps each reading mark written before a heading's type to its Mark.
-var marks = map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👀": MarkReadCode, "👤": MarkPerson}
+var marks = map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👤": MarkPerson}
 
 var checkNames = []string{"hurl", "go test", "make check", "cargo test", "npm test"}
 

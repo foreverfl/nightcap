@@ -1,7 +1,7 @@
-## 무엇을
+## What
 {{.Summary}}
 
-## 읽는 순서
+## Review order
 {{- if .ReviewOrder}}
 {{.ReviewOrder}}
 {{- else}}
@@ -10,26 +10,26 @@
 {{- end}}
 {{- end}}
 
-## 위험
+## Risks
 {{- if .IsMissingEnglish}}
-- 영문 없음
+- no English block
 {{- end}}
 {{- if .IsMissingReviewOrder}}
-- 읽는 순서 없음
+- no review order
 {{- end}}
 {{- range .Units}}
   {{- if .ReadCodeReason}}
-- 코드까지 읽어야 함: {{.ReadCodeReason}}
+- {{.ReadCodeReason}}
   {{- end}}
 {{- end}}
 {{- range .Risks}}
 - {{.}}
 {{- end}}
 {{- if .HasNoRisk}}
-- 없음
+- none
 {{- end}}
 
-## 확인한 것
+## Verified
 ```
 {{.CheckTail}}
 ```

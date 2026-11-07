@@ -128,10 +128,10 @@ func Run(args []string, stdout io.Writer) error {
 			if err := runUnit(ctx, stdout, loaded, target, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
 				return err
 			}
-			if err := openDraftPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
+			if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(target.Lang, "en")); err != nil {
 				return err
 			}
-			if err := markReadyWhenFinished(stdout, statePath, worktreeDir, target.MergeMethod, section); err != nil {
+			if err := labelWhenFinished(stdout, statePath, worktreeDir, target.MergeMethod, section); err != nil {
 				return err
 			}
 			break
@@ -290,10 +290,10 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Ta
 	return verdict, nil
 }
 
-// openDraftPR pushes section's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
-// then opens a draft PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
+// openPR pushes section's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
+// then opens a PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
 // isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack. It returns an error when git, gh or the state file fails.
-func openDraftPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
+func openPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -336,11 +336,11 @@ func openDraftPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, 
 	if hasPR {
 		return pr.EditBody(worktreeDir, branch, body)
 	}
-	prURL, err := pr.CreateDraft(worktreeDir, base, section.Type+": "+section.Title, body)
+	prURL, err := pr.Create(worktreeDir, base, section.Type+": "+section.Title, body)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "  draft PR: %s\n", prURL)
+	fmt.Fprintf(stdout, "  PR: %s\n", prURL)
 	if previousURL != "" {
 		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
 			return err
@@ -367,8 +367,8 @@ func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle s
 	return input
 }
 
-// markReadyWhenFinished marks the PR ready when every unit is done, adds the label the heading's mark names, and turns on auto-merge for 🤖.
-func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, section plan.Section) error {
+// labelWhenFinished adds, once every unit is done, the label the heading's mark names, and turns on auto-merge for 🤖.
+func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, section plan.Section) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -380,10 +380,6 @@ func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod
 		}
 	}
 	branch := section.Type + "/" + section.Slug
-	if err := pr.MarkReady(worktreeDir, branch); err != nil {
-		return err
-	}
-	fmt.Fprintf(stdout, "  ready: %s\n", branch)
 	label := pr.ReadingLabel(section.Mark)
 	if err := pr.AddLabel(worktreeDir, branch, label); err != nil {
 		return err

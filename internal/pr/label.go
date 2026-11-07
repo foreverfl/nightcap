@@ -3,19 +3,16 @@ package pr
 import "nightcap/internal/plan"
 
 const (
-	autoLabel     = "nightcap:auto"
-	readPRLabel   = "nightcap:read-pr"
-	readCodeLabel = "nightcap:read-code"
+	autoLabel   = "nightcap:auto"
+	readPRLabel = "nightcap:read-pr"
 )
 
-// ReadingLabel returns the label the heading's reading mark names: nightcap:auto for 🤖, nightcap:read-code for 👀,
+// ReadingLabel returns the label the heading's reading mark names: nightcap:auto for 🤖,
 // otherwise nightcap:read-pr. What the night run found never changes it; that goes to the risk section instead.
 func ReadingLabel(mark plan.Mark) string {
 	switch mark {
 	case plan.MarkAuto:
 		return autoLabel
-	case plan.MarkReadCode:
-		return readCodeLabel
 	}
 	return readPRLabel
 }

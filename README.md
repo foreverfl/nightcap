@@ -4,7 +4,7 @@ Runs Claude Code overnight against one heading of a plan file, one unit at a tim
 
 - Contract files are create-only: the agent may add a test, a hurl or a spec, never edit or delete one.
 - Dependencies are yours: a change to go.mod, Cargo.toml or package.json is a red run, not a PR.
-- The heading picks the label: `🤖` auto-merges (`nightcap:auto`), `📄` read the PR (`nightcap:read-pr`), `👀` read the code (`nightcap:read-code`), `👤` a person does it. What nightcap notices at night goes into the risk list, not the label.
+- The heading picks the label: `🤖` auto-merges (`nightcap:auto`), `📄` read the PR (`nightcap:read-pr`), `👤` a person does it. What nightcap notices at night goes into the risk list, not the label.
 
 ## Setup
 
@@ -26,4 +26,10 @@ targets:
     read_code: [services/go-api/internal/auth/*]
     lang: [en, ko]            # PR body languages, default [ko]
     merge_method: rebase      # how a 🤖 PR auto-merges: rebase, otherwise merge. default merge
+```
+
+Before the first 🤖 heading, turn auto-merge on in the repo once. With `merge_method: rebase`, allow rebase merges too:
+
+```sh
+gh repo edit <owner>/<repo> --enable-auto-merge --enable-rebase-merge
 ```

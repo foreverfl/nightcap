@@ -4,7 +4,7 @@
 
 - 계약 파일은 만들 수만 있다: 에이전트는 테스트 · hurl · 명세를 추가할 수는 있어도 고치거나 지우지 못한다.
 - 의존성은 사람 몫이다: go.mod · Cargo.toml · package.json이 바뀌면 PR 없이 빨강으로 끝난다.
-- 라벨은 제목의 표시가 정한다: `🤖`는 auto-merge(`nightcap:auto`), `📄`는 PR만 읽고(`nightcap:read-pr`), `👀`는 코드까지 읽고(`nightcap:read-code`), `👤`는 사람이 한다. 밤에 걸린 것은 라벨이 아니라 위험 목록에 적힌다.
+- 라벨은 제목의 표시가 정한다: `🤖`는 auto-merge(`nightcap:auto`), `📄`는 PR만 읽고(`nightcap:read-pr`), `👤`는 사람이 한다. 밤에 걸린 것은 라벨이 아니라 위험 목록에 적힌다.
 
 ## 설정
 
@@ -26,4 +26,10 @@ targets:
     read_code: [services/go-api/internal/auth/*]
     lang: [en, ko]            # PR 본문 언어, 기본값 [ko]
     merge_method: rebase      # 🤖 PR이 auto-merge될 때 방식: rebase면 rebase, 아니면 merge. 기본값 merge
+```
+
+첫 🤖 제목 전에 레포에서 auto-merge를 한 번 켠다. `merge_method: rebase`면 rebase 머지도 같이 허용한다:
+
+```sh
+gh repo edit <owner>/<repo> --enable-auto-merge --enable-rebase-merge
 ```
