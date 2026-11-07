@@ -1,15 +1,20 @@
 package pr
 
-import "testing"
+import (
+	"testing"
 
-func TestReadingLabelWithoutReadCodeIsReadPR(t *testing.T) {
-	if label := ReadingLabel([]string{"green", "green"}); label != "nightcap:read-pr" {
-		t.Fatalf("all green should be nightcap:read-pr, got %q", label)
+	"nightcap/internal/plan"
+)
+
+func TestReadingLabelFollowsTheMark(t *testing.T) {
+	want := map[plan.Mark]string{
+		plan.MarkAuto:     "nightcap:auto",
+		plan.MarkReadPR:   "nightcap:read-pr",
+		plan.MarkReadCode: "nightcap:read-code",
 	}
-}
-
-func TestReadingLabelWithOneReadCodeIsReadCode(t *testing.T) {
-	if label := ReadingLabel([]string{"green", "read-code"}); label != "nightcap:read-code" {
-		t.Fatalf("one read-code should be nightcap:read-code, got %q", label)
+	for mark, label := range want {
+		if got := ReadingLabel(mark); got != label {
+			t.Fatalf("%s: got %q, want %q", mark, got, label)
+		}
 	}
 }

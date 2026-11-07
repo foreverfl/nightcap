@@ -1,15 +1,20 @@
 package pr
 
-import "slices"
+import "nightcap/internal/plan"
 
 const (
+	autoLabel     = "nightcap:auto"
 	readPRLabel   = "nightcap:read-pr"
 	readCodeLabel = "nightcap:read-code"
 )
 
-// ReadingLabel returns nightcap:read-code when any of the units' results is read-code, otherwise nightcap:read-pr.
-func ReadingLabel(unitResults []string) string {
-	if slices.Contains(unitResults, "read-code") {
+// ReadingLabel returns the label the heading's reading mark names: nightcap:auto for 🤖, nightcap:read-code for 👀,
+// otherwise nightcap:read-pr. What the night run found never changes it; that goes to the risk section instead.
+func ReadingLabel(mark plan.Mark) string {
+	switch mark {
+	case plan.MarkAuto:
+		return autoLabel
+	case plan.MarkReadCode:
 		return readCodeLabel
 	}
 	return readPRLabel
