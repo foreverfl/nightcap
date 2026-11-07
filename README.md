@@ -26,3 +26,9 @@ targets:
     lang: [en, ko]            # PR body languages, default [ko]
     merge_method: rebase      # how a 🤖 PR auto-merges: rebase, otherwise merge. default merge
 ```
+
+Before the first 🤖 heading, turn auto-merge on in the repo once. With `merge_method: rebase`, allow rebase merges too:
+
+```sh
+gh repo edit <owner>/<repo> --enable-auto-merge --enable-rebase-merge
+```

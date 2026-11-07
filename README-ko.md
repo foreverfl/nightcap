@@ -26,3 +26,9 @@ targets:
     lang: [en, ko]            # PR 본문 언어, 기본값 [ko]
     merge_method: rebase      # 🤖 PR이 auto-merge될 때 방식: rebase면 rebase, 아니면 merge. 기본값 merge
 ```
+
+첫 🤖 제목 전에 레포에서 auto-merge를 한 번 켠다. `merge_method: rebase`면 rebase 머지도 같이 허용한다:
+
+```sh
+gh repo edit <owner>/<repo> --enable-auto-merge --enable-rebase-merge
+```
