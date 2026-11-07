@@ -28,8 +28,8 @@ type BodyInput struct {
 	CheckTail   string
 	ReviewOrder string // the flows claude wrote from the diff; empty means list each unit's WHAT and DONE instead
 
-	IsMissingEnglish     bool // translation failed, so the risk section opens with "영문 없음"
-	IsMissingReviewOrder bool // claude could not write the review order, so the risk section says "읽는 순서 없음"
+	IsMissingEnglish     bool // translation failed, so the risk section opens with "no English block"
+	IsMissingReviewOrder bool // claude could not write the review order, so the risk section says "no review order"
 }
 
 // HasNoRisk reports whether the risk section would be empty: no missing English or review order, no read-code reason and no risk line.
@@ -49,7 +49,7 @@ func BuildBody(input BodyInput) (string, error) {
 }
 
 // BuildBilingualBody returns the English description translated from the Korean one, a "---", then the Korean one.
-// When translate fails it returns the Korean one alone with "영문 없음" first in the risk section;
+// When translate fails it returns the Korean one alone with "no English block" first in the risk section;
 // it returns an error only when the template cannot be filled.
 func BuildBilingualBody(input BodyInput, translate func(korean string) (string, error)) (string, error) {
 	korean, err := BuildBody(input)
