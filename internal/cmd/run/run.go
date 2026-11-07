@@ -16,6 +16,7 @@ import (
 	"nightcap/internal/client/claude"
 	"nightcap/internal/config"
 	"nightcap/internal/git"
+	"nightcap/internal/notify"
 	"nightcap/internal/plan"
 	"nightcap/internal/pr"
 	"nightcap/internal/state"
@@ -38,6 +39,9 @@ func Run(args []string, stdout io.Writer) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	started := time.Now()
+	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
+	defer func() { sendNightSummary(ctx, loaded, started, startUsage) }()
 
 	for _, target := range loaded.Targets {
 		planText, err := os.ReadFile(target.Plan)
@@ -114,6 +118,9 @@ func Run(args []string, stdout io.Writer) error {
 			// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
 			usageJSON, _ := claude.Usage(ctx)
 			current, _ := usage.Read(usageJSON)
+			if !startUsage.Known {
+				startUsage = current
+			}
 			if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
 				fmt.Fprintf(stdout, "  stop: %s\n", reason)
 				return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
@@ -389,4 +396,24 @@ func markReadyWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod
 		fmt.Fprintf(stdout, "  auto-merge: %s\n", branch)
 	}
 	return nil
+}
+
+// sendNightSummary sends the morning message: the repos, the times and, when a unit ran, the usage. A failed send only prints to stderr.
+func sendNightSummary(ctx context.Context, loaded config.Config, started time.Time, startUsage usage.Usage) {
+	night := notify.Night{Start: started, End: time.Now()}
+	for _, target := range loaded.Targets {
+		night.Repos = append(night.Repos, filepath.Base(target.Repo))
+	}
+	if startUsage.Known {
+		usageJSON, _ := claude.Usage(ctx)
+		if endUsage, _ := usage.Read(usageJSON); endUsage.Known {
+			night.Usage = []notify.UsageLine{
+				{Name: "session", Start: startUsage.Session.Percent, End: endUsage.Session.Percent},
+				{Name: "weekly", Start: startUsage.WeeklyAll.Percent, End: endUsage.WeeklyAll.Percent},
+			}
+		}
+	}
+	if err := notify.Send(loaded.Webhook, notify.Message(night)); err != nil {
+		fmt.Fprintln(os.Stderr, "notify:", err)
+	}
 }

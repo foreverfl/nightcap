@@ -18,6 +18,7 @@ limit_session: 80          # no new unit starts while the 5h window is above thi
 limit_weekly_all: 80       # no new unit starts while the weekly % is above this; ignored within 24h of its reset
 max_turns: 30
 max_rounds: 3
+webhook: https://discord.com/api/webhooks/…   # Discord or Slack (hooks.slack.com); one message when the night ends, empty for none
 targets:
   - plan: ~/work/todolist/blog-v2/github-rank-commit.md
     repo: ~/workspace/apps-web/blog-v2
