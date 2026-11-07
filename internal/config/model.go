@@ -13,9 +13,11 @@ type Config struct {
 
 // Target pairs one plan file with the repo its units commit to.
 type Target struct {
-	Plan     string   `yaml:"plan"`
-	Repo     string   `yaml:"repo"`
-	Check    string   `yaml:"check"`
-	ReadCode []string `yaml:"read_code"` // path globs that always send a PR to read-code
-	Lang     []string `yaml:"lang"`      // PR body languages, e.g. [ko] or [en, ko]
+	Plan         string   `yaml:"plan"`
+	Repo         string   `yaml:"repo"`
+	Check        string   `yaml:"check"`
+	ReadCode     []string `yaml:"read_code"`    // path globs that always send a PR to read-code
+	Protected    []string `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
+	Dependencies []string `yaml:"dependencies"` // dependency file globs the agent may not touch
+	Lang         []string `yaml:"lang"`         // PR body languages, e.g. [ko] or [en, ko]
 }

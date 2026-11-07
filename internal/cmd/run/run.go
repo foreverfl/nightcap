@@ -272,7 +272,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, target config.Ta
 		return check.Verdict{}, err
 	}
 	fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
-	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), target.ReadCode)
+	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), target.ReadCode, target.Protected, target.Dependencies)
 	if verdict.Red {
 		fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
 	} else if verdict.ReadCode {

@@ -15,8 +15,6 @@ type Verdict struct {
 	Reason   string
 }
 
-var contractFiles = []string{"*_test.go", "*.hurl", "openapi/*", "Makefile"}
-
 var skipMarkers = []string{
 	// Go testing
 	"t.Skip",
@@ -46,24 +44,18 @@ var skipCallsAtLineStart = []string{
 	"fit(", "fdescribe(",
 }
 
-var dependencyFiles = []string{
-	"go.mod", "go.sum",
-	"Cargo.toml", "Cargo.lock",
-	"package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock",
-}
-
 // A newly added file whose path contains this word is treated as a database migration.
 const migrationPathWord = "migration"
 
-// Classify returns a red Verdict when a change touches a dependency file, modifies or deletes an existing
-// contract file (adding a new one is allowed), or an added line carries a skip marker; past those, a ReadCode
+// Classify returns a red Verdict when a change touches one of dependencies, modifies or deletes an existing
+// file matching protected (adding a new one is allowed), or an added line carries a skip marker; past those, a ReadCode
 // one when a change matches readCode, adds a migration or sits outside wherePaths. Otherwise an empty Verdict.
-func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, readCode []string) Verdict {
+func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, readCode, protected, dependencies []string) Verdict {
 	for _, change := range changes {
-		if matchesAny(change.Path, dependencyFiles) {
+		if matchesAny(change.Path, dependencies) {
 			return Verdict{Red: true, Reason: "changed a dependency file: " + change.Path}
 		}
-		if change.Status != "A" && matchesAny(change.Path, contractFiles) {
+		if change.Status != "A" && matchesAny(change.Path, protected) {
 			return Verdict{Red: true, Reason: "edited a contract file: " + change.Path}
 		}
 	}
