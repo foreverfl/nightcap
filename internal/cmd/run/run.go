@@ -26,8 +26,8 @@ import (
 )
 
 // Run is the "run" subcommand; args is everything after "run", and its first item is the plan file.
-// For now it picks the plan's top heading that has a unit to take, checks its branch out in a worktree of the frontmatter's repo and runs
-// the first unit that has a check through runCommit; it returns an error when no plan file is named,
+// For now it picks the plan's top PR that has a commit to take, checks its branch out in a worktree of the frontmatter's repo and runs
+// the first commit that has a test through runCommit; it returns an error when no plan file is named,
 // or when the config, the plan file, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
@@ -55,7 +55,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a commit, so a night that runs nothing never calls claude
 	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
-	var pickedPR *plan.PR // the heading tonight took; nil when there was none
+	var pickedPR *plan.PR // the PR tonight took; nil when there was none
 	// one file per run, under its start date: .nightcap/runs/261108/225500.jsonl
 	runPath := filepath.Join(meta.Repo, ".nightcap", "runs", started.Format("060102"), started.Format("150405")+".jsonl")
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
@@ -89,8 +89,8 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		previousOpenBranch = ""
 		previousOpenURL = ""
 		if state.IsBlocked(saved.PRs[planPR.Slug]) {
-			fmt.Fprintf(stdout, "stop %s: blocked, the headings below wait\n", planPR.Title)
-			break // plans are written top to bottom, so a heading below stands on this one
+			fmt.Fprintf(stdout, "stop %s: blocked, the PRs below wait\n", planPR.Title)
+			break // plans are written top to bottom, so a PR below stands on this one
 		}
 		if len(planPR.Commits) > 0 {
 			view, err := pr.ViewBranch(meta.Repo, planPR.Type+"/"+planPR.Slug)
@@ -161,7 +161,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	return nil
 }
 
-// runCommit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail or a red verdict's
+// runCommit runs claude then the test on one commit up to MaxRounds times, feeding a red test's tail or a red verdict's
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
 // or claude stops before Done. Every round's outcome goes into the state file at statePath,
 // and commit_start, each round and each test go as lines into the run file at runPath.
@@ -173,7 +173,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	appendEvent(runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: commit.Title})
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
-		logPath := filepath.Join(meta.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
+		logPath := filepath.Join(meta.Repo, ".nightcap", "logs", slug, fmt.Sprintf("commit%d-round%d.log", number, round))
 		roundStarted := time.Now()
 		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
@@ -205,7 +205,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if result.Outcome != claude.Done {
 			break
 		}
-		// 1. Check: run the check command from nightcap.yml (tests pass or not)
+		// 1. Test: run the test command from the plan's frontmatter (pass or not)
 		tested, err := test.Run(ctx, worktreeDir, meta.Test)
 		if err != nil {
 			return err
@@ -214,7 +214,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: commit.Title, Result: color(tested.Green)})
 		failure := tested.Tail
 		record.Result, record.Reason, record.TestTail = "red", "", tested.Tail
-		// 2. Classify: sort what the branch changed by the rules in check/classify.go
+		// 2. Verdict: sort what the branch changed by the rules in verdict/classify.go
 		if tested.Green {
 			verdict, err := classifyBranch(stdout, worktreeDir, base, meta, commit)
 			if err != nil {
@@ -248,10 +248,10 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	return state.SaveCommit(statePath, slug, commit.Title, record)
 }
 
-// usageStopReason says why no unit should open at now under loaded's limits, or "" when one may.
+// usageStopReason says why no commit should start at now under loaded's limits, or "" when one may.
 // The weekly limit is skipped within 24h of its reset, and a window not open yet is taken to reset at now + 5h.
 func usageStopReason(now time.Time, current usage.Usage, loaded config.Config) string {
-	// stop 1: the 5h window is already at limit_session, so this unit could hit the limit halfway
+	// stop 1: the 5h window is already at limit_session, so this commit could hit the limit halfway
 	if current.Known && loaded.LimitSession > 0 && current.Session.Percent >= loaded.LimitSession {
 		return fmt.Sprintf("session %d%% ≥ %d", current.Session.Percent, loaded.LimitSession)
 	}
@@ -287,7 +287,7 @@ var sleepUntil = func(ctx context.Context, wakeAt time.Time) {
 	}
 }
 
-// color names a check result the way the plan file does: "green" for pass, "red" for fail.
+// color names a test result the way the plan file does: "green" for pass, "red" for fail.
 func color(green bool) string {
 	if green {
 		return "green"
@@ -322,7 +322,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 }
 
 // openPR pushes planPR's branch from worktreeDir once commitTitle has ended green or read-code in the state file at statePath,
-// then opens a PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
+// then opens a PR, or with hasPR replaces its description, listing every finished commit (English above Korean when
 // isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack, and a pr_open line goes into the run file at runPath.
 // It returns an error when git, gh or the state file fails.
 func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR, isEnglishWanted bool) error {
@@ -382,8 +382,8 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	return state.SavePRStatus(statePath, planPR.Slug, prURL, "OPEN")
 }
 
-// bodyInput collects the PR description's values: planPR's summary, every unit of planPR that ended green or read-code
-// in savedPR, in plan order, and the last check tail of lastCommitTitle.
+// bodyInput collects the PR description's values: planPR's summary, every commit of planPR that ended green or read-code
+// in savedPR, in plan order, and the last test tail of lastCommitTitle.
 func bodyInput(planPR plan.PR, savedPR state.PR, lastCommitTitle string) pr.BodyInput {
 	input := pr.BodyInput{Summary: planPR.Summary, TestTail: savedPR.Commits[lastCommitTitle].TestTail}
 	for _, commit := range planPR.Commits {
@@ -391,16 +391,16 @@ func bodyInput(planPR plan.PR, savedPR state.PR, lastCommitTitle string) pr.Body
 		if record.Result != "green" && record.Result != "read-code" {
 			continue
 		}
-		bodyUnit := pr.BodyUnit{What: plan.LabelValue(commit.Body, "WHAT"), Done: plan.LabelValue(commit.Body, "DONE")}
+		bodyCommit := pr.BodyCommit{What: plan.LabelValue(commit.Body, "WHAT"), Done: plan.LabelValue(commit.Body, "DONE")}
 		if record.Result == "read-code" {
-			bodyUnit.ReadCodeReason = record.Reason
+			bodyCommit.ReadCodeReason = record.Reason
 		}
-		input.Units = append(input.Units, bodyUnit)
+		input.Commits = append(input.Commits, bodyCommit)
 	}
 	return input
 }
 
-// labelWhenFinished adds, once every unit is done, the label the heading's mark names, and turns on auto-merge for 🤖.
+// labelWhenFinished adds, once every commit is done, the label the PR's mark names, and turns on auto-merge for 🤖.
 func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, planPR plan.PR) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
@@ -427,7 +427,7 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	return nil
 }
 
-// sendNightSummary sends the morning message: the repo, the times, when a unit ran the usage, and the picked heading's line
+// sendNightSummary sends the morning message: the repo, the times, when a commit ran the usage, and the picked PR's line
 // read from the state file at statePath. A failed send or an unreadable state file only prints to stderr.
 func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedPR *plan.PR, started time.Time, startUsage usage.Usage) {
 	summary := notify.Summary{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
@@ -454,7 +454,7 @@ func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath
 	}
 }
 
-// prSummary reads how planPR's units ended in the state file at statePath: green and read-code count as done,
+// prSummary reads how planPR's commits ended in the state file at statePath: green and read-code count as done,
 // and the first other result is the failure word. It returns an error when the state file cannot be read.
 func prSummary(statePath string, planPR plan.PR) (notify.PR, error) {
 	saved, err := state.Load(statePath)
@@ -479,7 +479,7 @@ func prSummary(statePath string, planPR plan.PR) (notify.PR, error) {
 	return prResult, nil
 }
 
-// stopReason returns the reason of a unit of planPR that the state file at statePath saved as stopped after started,
+// stopReason returns the reason of a commit of planPR that the state file at statePath saved as stopped after started,
 // so a stop from an earlier night is not reported again; it returns "" when there is none or the file cannot be read.
 func stopReason(statePath string, planPR plan.PR, started time.Time) string {
 	saved, _ := state.Load(statePath)

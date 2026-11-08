@@ -12,9 +12,9 @@ import (
 	"testing"
 )
 
-// setUpRepoWithOneUnitPlan makes a temp folder holding a git repo with a bare origin, a one-unit plan and a nightcap.yml
+// setUpRepoWithOneCommitPlan makes a temp folder holding a git repo with a bare origin, a one-commit plan and a nightcap.yml
 // pointing at both, swaps in a fake gh with no PR, moves into it, and returns the repo path.
-func setUpRepoWithOneUnitPlan(t *testing.T) string {
+func setUpRepoWithOneCommitPlan(t *testing.T) string {
 	t.Helper()
 	t.Chdir(t.TempDir())
 	repo, _ := filepath.Abs("repo")
@@ -34,7 +34,7 @@ func setUpRepoWithOneUnitPlan(t *testing.T) string {
 	return repo
 }
 
-// writePlan writes commit-bot.md: a frontmatter naming repo, the test command and the protected and dependency files, then one heading with one unit.
+// writePlan writes commit-bot.md: a frontmatter naming repo, the test command and the protected and dependency files, then one PR with one commit.
 func writePlan(t *testing.T, repo, test string) {
 	t.Helper()
 	planText := strings.Join([]string{
@@ -99,7 +99,7 @@ func useFakeGh(t *testing.T, prStates map[string]string) string {
 }
 
 func TestDispatchRunPrintsPickedSection(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr)
@@ -111,7 +111,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 		"  branch: feat/feed",
 		"  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed"),
 		"  take  add it",
-		"  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log") + ")",
+		"  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/commit1-round1.log") + ")",
 		"  test: green",
 		"  added lines: 0",
 		"  verdict: green",
@@ -128,7 +128,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 }
 
 func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout, stderr bytes.Buffer
@@ -167,7 +167,7 @@ func runFileKinds(t *testing.T, repo string) []string {
 }
 
 func TestRunLogsEachRoundAndTestToTheRunFile(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout, stderr bytes.Buffer
@@ -181,7 +181,7 @@ func TestRunLogsEachRoundAndTestToTheRunFile(t *testing.T) {
 }
 
 func TestRunMarksUnitBlockedWhenTheSameFailureRepeats(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "false", "max_rounds: 3\n")
 	var stdout, stderr bytes.Buffer
@@ -206,7 +206,7 @@ func TestDispatchUnknownCommandPrintsUsageAndExits2(t *testing.T) {
 }
 
 func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	fakeClaude := filepath.Join(t.TempDir(), "claude")
 	script := strings.Join([]string{
 		"#!/bin/sh",
@@ -238,7 +238,7 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 }
 
 func TestRunStopsAtAHeadingThatEndedBlocked(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "false", "max_rounds: 2\n")
 	planFile, err := os.OpenFile("commit-bot.md", os.O_APPEND|os.O_WRONLY, 0)
@@ -265,7 +265,7 @@ func TestRunStopsAtAHeadingThatEndedBlocked(t *testing.T) {
 		t.Fatalf("second run: exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
 	want := strings.Join([]string{
-		"stop feed: blocked, the headings below wait",
+		"stop feed: blocked, the PRs below wait",
 		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if secondStdout.String() != want {
@@ -274,7 +274,7 @@ func TestRunStopsAtAHeadingThatEndedBlocked(t *testing.T) {
 }
 
 func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
-	setUpRepoWithOneUnitPlan(t)
+	setUpRepoWithOneCommitPlan(t)
 	useFakeGh(t, map[string]string{"feat/feed": "MERGED"})
 	var stdout, stderr bytes.Buffer
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
@@ -285,7 +285,7 @@ func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
 		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if stdout.String() != want {
-		t.Fatalf("a heading whose PR was merged should be skipped, got %q", stdout.String())
+		t.Fatalf("a PR that was merged should be skipped, got %q", stdout.String())
 	}
 }
 
@@ -297,7 +297,7 @@ func TestRunWithoutAPlanFileFails(t *testing.T) {
 }
 
 func TestStatusPrintsTheFrontmatterRepo(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	var stdout, stderr bytes.Buffer
 	// each worktree line is git worktree list's own "<path>  <commit> [main]"
 	if code := dispatch([]string{"status", "commit-bot.md"}, &stdout, &stderr); code != 0 || !strings.HasPrefix(stdout.String(), repo+"\n") || !strings.Contains(stdout.String(), "[main]") {
@@ -332,7 +332,7 @@ func TestRunWithoutProtectedInTheFrontmatterFails(t *testing.T) {
 }
 
 func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	planText := []byte(strings.Join([]string{
 		"---",
@@ -372,7 +372,7 @@ func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
 	}
 }
 
-// oneLintPlan is the smallest plan lint passes: one typed heading with one unit that has a check.
+// oneLintPlan is the smallest plan lint passes: one typed PR with one commit that has a test.
 func oneLintPlan() string {
 	return "## 📄 feat: a (b)\n" +
 		"- [ ] read the docs\n" +
@@ -393,14 +393,14 @@ func runLint(t *testing.T, plan string) (int, string) {
 
 func TestLintPlanWithoutTypedHeadingExits1(t *testing.T) {
 	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## 📄 feat: a (b)", "## cmd", 1))
-	if code != 1 || stdout != "no heading with type: slug\n" {
-		t.Fatalf("want exit 1 and the no-heading line, got %d %q", code, stdout)
+	if code != 1 || stdout != "no PR with type: slug\n" {
+		t.Fatalf("want exit 1 and the no-PR line, got %d %q", code, stdout)
 	}
 }
 
 func TestLintUnitWithoutCheckExits1(t *testing.T) {
 	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "go test ./... passes", "테스트가 없음", 1))
-	want := "heading: feat: a (b)\n  no test: read the docs\n"
+	want := "PR: feat: a (b)\n  no test: read the docs\n"
 	if code != 1 || stdout != want {
 		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
 	}
@@ -422,14 +422,14 @@ func TestLintHeadingWithoutAMarkExits1(t *testing.T) {
 
 func TestLintWherePathWithASpaceExits1(t *testing.T) {
 	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "  - DONE", "  - WHERE (blog-v2) a b/\n  - DONE", 1))
-	want := "heading: feat: a (b)\n  WHERE path not readable: a b/\n"
+	want := "PR: feat: a (b)\n  WHERE path not readable: a b/\n"
 	if code != 1 || stdout != want {
 		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
 	}
 }
 
 func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
-	repo := setUpRepoWithOneUnitPlan(t)
+	repo := setUpRepoWithOneCommitPlan(t)
 	// the fake prints its arguments to stderr, which lands in the round log, and answers with one session_id
 	fakeClaude := filepath.Join(t.TempDir(), "claude")
 	script := "#!/bin/sh\necho \"$@\" >&2\necho '{\"type\":\"result\",\"result\":\"ok\",\"session_id\":\"s1\"}'\n"
@@ -442,8 +442,8 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	first, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log"))
-	second, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/unit1-round2.log"))
+	first, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/commit1-round1.log"))
+	second, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/commit1-round2.log"))
 	if strings.Contains(string(first), "--resume") || !strings.Contains(string(second), "--resume s1") {
 		t.Fatalf("round 1 should start a session and round 2 resume s1\nround 1: %s\nround 2: %s", first, second)
 	}

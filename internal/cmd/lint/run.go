@@ -11,8 +11,8 @@ import (
 	"nightcap/internal/verdict"
 )
 
-// Run is the "lint" subcommand; args[0] is the plan file. It prints every heading a night run can read, each 👤 heading as person, each heading without a reading mark as no mark,
-// every open unit whose DONE names no check, and every WHERE path the run cannot read inside the repo,
+// Run is the "lint" subcommand; args[0] is the plan file. It prints every PR a night run can read, each 👤 PR as person, each PR without a reading mark as no mark,
+// every open commit whose DONE names no test, and every WHERE path the run cannot read inside the repo,
 // and returns an error when any of those is found or the file cannot be read.
 func Run(args []string, stdout io.Writer) error {
 	if len(args) == 0 {
@@ -24,7 +24,7 @@ func Run(args []string, stdout io.Writer) error {
 	}
 	planPRs := plan.Parse(string(planText))
 	if len(planPRs) == 0 {
-		fmt.Fprintln(stdout, "no heading with type: slug")
+		fmt.Fprintln(stdout, "no PR with type: slug")
 		return errors.New("lint: the plan has problems")
 	}
 	hasProblem := false
@@ -38,7 +38,7 @@ func Run(args []string, stdout io.Writer) error {
 			hasProblem = true
 			continue
 		}
-		fmt.Fprintf(stdout, "heading: %s: %s (%s)\n", planPR.Type, planPR.Title, planPR.Slug)
+		fmt.Fprintf(stdout, "PR: %s: %s (%s)\n", planPR.Type, planPR.Title, planPR.Slug)
 		for _, commit := range planPR.Commits {
 			if !commit.HasTest {
 				fmt.Fprintf(stdout, "  no test: %s\n", commit.Title)

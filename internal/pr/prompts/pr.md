@@ -5,7 +5,7 @@
 {{- if .ReviewOrder}}
 {{.ReviewOrder}}
 {{- else}}
-{{- range .Units}}
+{{- range .Commits}}
 - {{.What}}: {{.Done}}
 {{- end}}
 {{- end}}
@@ -17,7 +17,7 @@
 {{- if .IsMissingReviewOrder}}
 - no review order
 {{- end}}
-{{- range .Units}}
+{{- range .Commits}}
   {{- if .ReadCodeReason}}
 - {{.ReadCodeReason}}
   {{- end}}

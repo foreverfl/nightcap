@@ -7,7 +7,7 @@ const (
 	readPRLabel = "nightcap:read-pr"
 )
 
-// ReadingLabel returns the label the heading's reading mark names: nightcap:auto for 🤖,
+// ReadingLabel returns the label the PR's reading mark names: nightcap:auto for 🤖,
 // otherwise nightcap:read-pr. What the night run found never changes it; that goes to the risk section instead.
 func ReadingLabel(mark plan.Mark) string {
 	switch mark {
