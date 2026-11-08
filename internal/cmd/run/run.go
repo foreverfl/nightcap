@@ -15,6 +15,7 @@ import (
 	"nightcap/internal/check"
 	"nightcap/internal/client/claude"
 	"nightcap/internal/config"
+	"nightcap/internal/events"
 	"nightcap/internal/git"
 	"nightcap/internal/notify"
 	"nightcap/internal/plan"
@@ -27,7 +28,7 @@ import (
 // For now it picks the plan's top heading that has a unit to take, checks its branch out in a worktree of the frontmatter's repo and runs
 // the first unit that has a check through runUnit; it returns an error when no plan file is named,
 // or when the config, the plan file, git, claude or sh fails.
-func Run(args []string, stdout io.Writer) error {
+func Run(args []string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
 		return errors.New("run: name a plan file")
 	}
@@ -54,7 +55,19 @@ func Run(args []string, stdout io.Writer) error {
 	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
 	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
 	var pickedSection *plan.Section // the heading tonight took; nil when there was none
-	defer func() { sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedSection, started, startUsage) }()
+	// one file per run, under its start date: .nightcap/runs/261108/225500.jsonl
+	runPath := filepath.Join(meta.Repo, ".nightcap", "runs", started.Format("060102"), started.Format("150405")+".jsonl")
+	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
+	defer func() {
+		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedSection, started, startUsage)
+		reason := ""
+		if runErr != nil {
+			reason = runErr.Error()
+		} else if pickedSection != nil {
+			reason = stopReason(statePath, *pickedSection, started)
+		}
+		appendEvent(runPath, events.Event{Kind: "run_end", At: time.Now(), Reason: reason})
+	}()
 
 	saved, err := state.Load(statePath)
 	if err != nil {
@@ -463,4 +476,11 @@ func stopReason(statePath string, section plan.Section, started time.Time) strin
 		}
 	}
 	return ""
+}
+
+// appendEvent adds event to the run file at path; a failed write only prints to stderr, so the log never stops a run.
+func appendEvent(path string, event events.Event) {
+	if err := events.Append(path, event); err != nil {
+		fmt.Fprintln(os.Stderr, "events:", err)
+	}
 }
