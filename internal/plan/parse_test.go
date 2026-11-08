@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// oneSection is the smallest plan that yields one section with one open unit.
-func oneSection() string {
+// onePR is the smallest plan that yields one PR with one open commit.
+func onePR() string {
 	return "## 📄 feat: 홈 화면 피드 (home-feed)\n" +
 		"\n" +
 		"Show the feed on the home screen.\n" +
@@ -17,62 +17,62 @@ func oneSection() string {
 		"  - DONE  go test ./internal/feed passes\n"
 }
 
-func TestParseReadsHeading(t *testing.T) {
-	section := Parse(oneSection())[0]
-	if section.Type != "feat" || section.Title != "홈 화면 피드" || section.Slug != "home-feed" {
-		t.Fatalf("got %q %q %q", section.Type, section.Title, section.Slug)
+func TestParseReadsPR(t *testing.T) {
+	planPR := Parse(onePR())[0]
+	if planPR.Type != "feat" || planPR.Title != "홈 화면 피드" || planPR.Slug != "home-feed" {
+		t.Fatalf("got %q %q %q", planPR.Type, planPR.Title, planPR.Slug)
 	}
 }
 
 func TestParseReadsSummary(t *testing.T) {
-	section := Parse(oneSection())[0]
-	if section.Summary != "Show the feed on the home screen." {
-		t.Fatalf("Summary = %q", section.Summary)
+	planPR := Parse(onePR())[0]
+	if planPR.Summary != "Show the feed on the home screen." {
+		t.Fatalf("Summary = %q", planPR.Summary)
 	}
 }
 
 func TestParseReadsUnitBody(t *testing.T) {
-	unit := Parse(oneSection())[0].Commits[0]
+	commit := Parse(onePR())[0].Commits[0]
 	want := "- [ ] add the list endpoint\n  - WHAT  return posts\n  - DONE  go test ./internal/feed passes"
-	if unit.Title != "add the list endpoint" || unit.Body != want {
-		t.Fatalf("got %q / %q", unit.Title, unit.Body)
+	if commit.Title != "add the list endpoint" || commit.Body != want {
+		t.Fatalf("got %q / %q", commit.Title, commit.Body)
 	}
 }
 
 func TestParseSkipsDoneUnits(t *testing.T) {
-	text := strings.Replace(oneSection(), "- [ ]", "- [x]", 1)
-	if units := Parse(text)[0].Commits; len(units) != 0 {
-		t.Fatalf("got %d units, want 0", len(units))
+	text := strings.Replace(onePR(), "- [ ]", "- [x]", 1)
+	if commits := Parse(text)[0].Commits; len(commits) != 0 {
+		t.Fatalf("got %d commits, want 0", len(commits))
 	}
 }
 
 func TestParseIgnoresCheckboxInsideFence(t *testing.T) {
-	text := oneSection() + "\n```text\n- [ ] not a unit\n```\n"
-	if units := Parse(text)[0].Commits; len(units) != 1 {
-		t.Fatalf("got %d units, want 1", len(units))
+	text := onePR() + "\n```text\n- [ ] not a commit\n```\n"
+	if commits := Parse(text)[0].Commits; len(commits) != 1 {
+		t.Fatalf("got %d commits, want 1", len(commits))
 	}
 }
 
 func TestParseMarksUnitWithoutCheckName(t *testing.T) {
-	text := strings.Replace(oneSection(), "go test ./internal/feed passes", "read it by hand", 1)
+	text := strings.Replace(onePR(), "go test ./internal/feed passes", "read it by hand", 1)
 	if Parse(text)[0].Commits[0].HasTest {
 		t.Fatal("HasTest = true, want false")
 	}
 }
 
-func TestParseSkipsHeadingWithoutType(t *testing.T) {
-	text := strings.Replace(oneSection(), "feat: 홈 화면 피드 (home-feed)", "홈 화면 피드", 1)
-	if sections := Parse(text); len(sections) != 0 {
-		t.Fatalf("got %d sections, want 0", len(sections))
+func TestParseSkipsPRWithoutType(t *testing.T) {
+	text := strings.Replace(onePR(), "feat: 홈 화면 피드 (home-feed)", "홈 화면 피드", 1)
+	if planPRs := Parse(text); len(planPRs) != 0 {
+		t.Fatalf("got %d planPRs, want 0", len(planPRs))
 	}
 }
 
-func TestPickSkipsSectionWithoutCheckableUnit(t *testing.T) {
-	manual := strings.Replace(oneSection(), "go test ./internal/feed passes", "read it by hand", 1)
-	second := strings.Replace(oneSection(), "(home-feed)", "(home-feed-2)", 1)
-	section, ok := Pick(Parse(manual + "\n" + second))
-	if !ok || section.Slug != "home-feed-2" {
-		t.Fatalf("got %q, %v; want home-feed-2", section.Slug, ok)
+func TestPickSkipsPRWithoutTestableCommit(t *testing.T) {
+	manual := strings.Replace(onePR(), "go test ./internal/feed passes", "read it by hand", 1)
+	second := strings.Replace(onePR(), "(home-feed)", "(home-feed-2)", 1)
+	planPR, ok := Pick(Parse(manual + "\n" + second))
+	if !ok || planPR.Slug != "home-feed-2" {
+		t.Fatalf("got %q, %v; want home-feed-2", planPR.Slug, ok)
 	}
 }
 
@@ -82,49 +82,49 @@ func TestParseReadsExamplePlans(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sections := Parse(string(text))
-		if len(sections) != 1 {
-			t.Fatalf("%s: got %d sections, want 1", path, len(sections))
+		planPRs := Parse(string(text))
+		if len(planPRs) != 1 {
+			t.Fatalf("%s: got %d planPRs, want 1", path, len(planPRs))
 		}
 		withTest := 0
-		for _, unit := range sections[0].Commits {
-			if unit.HasTest {
+		for _, commit := range planPRs[0].Commits {
+			if commit.HasTest {
 				withTest++
 			}
 		}
-		if len(sections[0].Commits) != 3 || withTest != 2 {
-			t.Fatalf("%s: got %d units, %d with a check; want 3 and 2", path, len(sections[0].Commits), withTest)
+		if len(planPRs[0].Commits) != 3 || withTest != 2 {
+			t.Fatalf("%s: got %d commits, %d with a test; want 3 and 2", path, len(planPRs[0].Commits), withTest)
 		}
 	}
 }
 
-func TestPickNeverTakesAPersonHeading(t *testing.T) {
-	person := strings.Replace(oneSection(), "## 📄 feat:", "## 👤 feat:", 1)
-	sections := Parse(person)
-	if len(sections) != 1 || !sections[0].IsPerson() || sections[0].Type != "feat" {
-		t.Fatalf("a 👤 heading should parse as a person section of type feat, got %+v", sections)
+func TestPickNeverTakesAPersonPR(t *testing.T) {
+	person := strings.Replace(onePR(), "## 📄 feat:", "## 👤 feat:", 1)
+	planPRs := Parse(person)
+	if len(planPRs) != 1 || !planPRs[0].IsPerson() || planPRs[0].Type != "feat" {
+		t.Fatalf("a 👤 PR should parse as a person PR of type feat, got %+v", planPRs)
 	}
-	if _, ok := Pick(sections); ok {
-		t.Fatal("Pick should not take a 👤 heading")
+	if _, ok := Pick(planPRs); ok {
+		t.Fatal("Pick should not take a 👤 PR")
 	}
 }
 
 func TestParseReadsEachReadingMark(t *testing.T) {
 	want := map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👤": MarkPerson}
 	for symbol, mark := range want {
-		section := Parse(strings.Replace(oneSection(), "📄", symbol, 1))[0]
-		if section.Mark != mark || section.Type != "feat" {
-			t.Fatalf("%s: got mark %q type %q, want %q feat", symbol, section.Mark, section.Type, mark)
+		planPR := Parse(strings.Replace(onePR(), "📄", symbol, 1))[0]
+		if planPR.Mark != mark || planPR.Type != "feat" {
+			t.Fatalf("%s: got mark %q type %q, want %q feat", symbol, planPR.Mark, planPR.Type, mark)
 		}
 	}
 }
 
-func TestPickSkipsAHeadingWithoutAMark(t *testing.T) {
-	sections := Parse(strings.Replace(oneSection(), "📄 ", "", 1))
-	if len(sections) != 1 || sections[0].Mark != MarkNone {
-		t.Fatalf("an unmarked heading should still parse with MarkNone, got %+v", sections)
+func TestPickSkipsAPRWithoutAMark(t *testing.T) {
+	planPRs := Parse(strings.Replace(onePR(), "📄 ", "", 1))
+	if len(planPRs) != 1 || planPRs[0].Mark != MarkNone {
+		t.Fatalf("an unmarked heading should still parse with MarkNone, got %+v", planPRs)
 	}
-	if _, ok := Pick(sections); ok {
-		t.Fatal("Pick should not take an unmarked heading")
+	if _, ok := Pick(planPRs); ok {
+		t.Fatal("Pick should not take an unmarked PR")
 	}
 }

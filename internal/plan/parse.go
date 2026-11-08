@@ -2,20 +2,22 @@ package plan
 
 import (
 	"bufio"
+	"slices"
 	"strings"
 )
 
-var sectionTypes = []string{"feat", "fix", "test", "docs", "refactor", "chore"}
+// prTypes are the Conventional Commits types a PR may use.
+var prTypes = []string{"feat", "fix", "test", "docs", "refactor", "chore"}
 
-// marks maps each reading mark written before a heading's type to its Mark.
+// marks maps each reading mark written before a PR's type to its Mark.
 var marks = map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👤": MarkPerson}
 
 var testNames = []string{"hurl", "go test", "make check", "cargo test", "npm test"}
 
-// Parse returns every "type: title (slug)" heading in a plan file with its open units, in file order.
-// Headings without a known type or a slug are skipped together with the units under them.
+// Parse returns every "## type: title (slug)" PR in a plan file with its open commits, in file order.
+// A "##" line without a known type or a slug is skipped together with the commits under it.
 func Parse(text string) []PR {
-	var sections []PR
+	var planPRs []PR
 	var current *Commit
 	underTypedHeading := false
 	inFence := false
@@ -26,7 +28,7 @@ func Parse(text string) []PR {
 		}
 		current.Body = strings.TrimRight(current.Body, "\n")
 		current.HasTest = hasTest(current.Body)
-		last := &sections[len(sections)-1]
+		last := &planPRs[len(planPRs)-1]
 		last.Commits = append(last.Commits, *current)
 		current = nil
 	}
@@ -54,10 +56,10 @@ func Parse(text string) []PR {
 			continue
 		}
 		if strings.HasPrefix(line, "#") {
-			section, ok := parseHeading(line)
+			planPR, ok := parsePRLine(line)
 			underTypedHeading = ok
 			if ok {
-				sections = append(sections, section)
+				planPRs = append(planPRs, planPR)
 			}
 			continue
 		}
@@ -68,41 +70,41 @@ func Parse(text string) []PR {
 			current = &Commit{Title: title, Body: line + "\n"}
 			continue
 		}
-		last := &sections[len(sections)-1]
+		last := &planPRs[len(planPRs)-1]
 		isPlainLine := line != "" && !isIndented(line) && !strings.HasPrefix(line, "- ")
 		if last.Summary == "" && len(last.Commits) == 0 && isPlainLine {
 			last.Summary = line
 		}
 	}
 	flush()
-	return sections
+	return planPRs
 }
 
-// Pick returns the first section that has a unit a night run can take, never one marked 👤 or not marked at all; ok is false when none matches.
-func Pick(sections []PR) (PR, bool) {
-	for _, section := range sections {
-		if section.IsPerson() || section.Mark == MarkNone {
+// Pick returns the first PR that has a commit a night run can take, never one marked 👤 or not marked at all; ok is false when none matches.
+func Pick(planPRs []PR) (PR, bool) {
+	for _, planPR := range planPRs {
+		if planPR.IsPerson() || planPR.Mark == MarkNone {
 			continue
 		}
-		for _, unit := range section.Commits {
-			if unit.HasTest {
-				return section, true
+		for _, commit := range planPR.Commits {
+			if commit.HasTest {
+				return planPR, true
 			}
 		}
 	}
 	return PR{}, false
 }
 
-// parseHeading splits "## 📄 feat: title (slug)" into a Section with its Mark; a heading without a mark parses with MarkNone.
-// ok is false for a heading without a known type or a slug.
-func parseHeading(line string) (PR, bool) {
+// parsePRLine splits "## 📄 feat: title (slug)" into a PR with its Mark; a line without a mark parses with MarkNone.
+// ok is false for a line without a known type or a slug.
+func parsePRLine(line string) (PR, bool) {
 	text := strings.TrimSpace(strings.TrimLeft(line, "#"))
 	mark := MarkNone
 	if symbol, rest, found := strings.Cut(text, " "); found && marks[symbol] != MarkNone {
 		mark, text = marks[symbol], rest
 	}
-	sectionType, rest, found := strings.Cut(text, ": ")
-	if !found || !isSectionType(sectionType) || !strings.HasSuffix(rest, ")") {
+	prType, rest, found := strings.Cut(text, ": ")
+	if !found || !slices.Contains(prTypes, prType) || !strings.HasSuffix(rest, ")") {
 		return PR{}, false
 	}
 	open := strings.LastIndex(rest, " (")
@@ -111,20 +113,10 @@ func parseHeading(line string) (PR, bool) {
 	}
 	return PR{
 		Mark:  mark,
-		Type:  sectionType,
+		Type:  prType,
 		Title: rest[:open],
 		Slug:  rest[open+2 : len(rest)-1],
 	}, true
-}
-
-// isSectionType reports whether word is one of the Conventional Commits types a heading may use.
-func isSectionType(word string) bool {
-	for _, known := range sectionTypes {
-		if word == known {
-			return true
-		}
-	}
-	return false
 }
 
 // isIndented reports whether line starts with a space or a tab.
@@ -132,7 +124,7 @@ func isIndented(line string) bool {
 	return strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")
 }
 
-// hasTest reports whether the unit's DONE line names one of testNames.
+// hasTest reports whether the commit's DONE line names one of testNames.
 func hasTest(body string) bool {
 	for _, line := range strings.Split(body, "\n") {
 		doneLine, isDone := strings.CutPrefix(strings.TrimSpace(line), "- DONE")
