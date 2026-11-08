@@ -21,6 +21,7 @@ import (
 	"nightcap/internal/plan"
 	"nightcap/internal/pr"
 	"nightcap/internal/state"
+	"nightcap/internal/test"
 	"nightcap/internal/usage"
 )
 
@@ -205,7 +206,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 			break
 		}
 		// 1. Check: run the check command from nightcap.yml (tests pass or not)
-		checked, err := check.Run(ctx, worktreeDir, meta.Test)
+		checked, err := test.Run(ctx, worktreeDir, meta.Test)
 		if err != nil {
 			return err
 		}
