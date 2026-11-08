@@ -55,8 +55,8 @@ func TestParseIgnoresCheckboxInsideFence(t *testing.T) {
 
 func TestParseMarksUnitWithoutCheckName(t *testing.T) {
 	text := strings.Replace(oneSection(), "go test ./internal/feed passes", "read it by hand", 1)
-	if Parse(text)[0].Commits[0].HasCheck {
-		t.Fatal("HasCheck = true, want false")
+	if Parse(text)[0].Commits[0].HasTest {
+		t.Fatal("HasTest = true, want false")
 	}
 }
 
@@ -86,14 +86,14 @@ func TestParseReadsExamplePlans(t *testing.T) {
 		if len(sections) != 1 {
 			t.Fatalf("%s: got %d sections, want 1", path, len(sections))
 		}
-		checked := 0
+		withTest := 0
 		for _, unit := range sections[0].Commits {
-			if unit.HasCheck {
-				checked++
+			if unit.HasTest {
+				withTest++
 			}
 		}
-		if len(sections[0].Commits) != 3 || checked != 2 {
-			t.Fatalf("%s: got %d units, %d with a check; want 3 and 2", path, len(sections[0].Commits), checked)
+		if len(sections[0].Commits) != 3 || withTest != 2 {
+			t.Fatalf("%s: got %d units, %d with a check; want 3 and 2", path, len(sections[0].Commits), withTest)
 		}
 	}
 }

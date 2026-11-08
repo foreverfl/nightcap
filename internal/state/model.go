@@ -20,7 +20,7 @@ type Commit struct {
 	Attempts     int           `json:"attempts"`
 	Result       string        `json:"result"` // green, read-code, red, blocked, interrupted, or stopped (by a usage limit)
 	Reason       string        `json:"reason"`
-	CheckTail    string        `json:"check_tail"`
+	TestTail     string        `json:"test_tail"`
 	UsageAtLimit *UsageAtLimit `json:"usage_at_limit,omitempty"` // set when claude hit a rate limit during this unit
 	UpdatedAt    time.Time     `json:"updated_at"`
 }

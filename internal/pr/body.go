@@ -25,7 +25,7 @@ type BodyInput struct {
 	Summary     string
 	Units       []BodyUnit
 	Risks       []string
-	CheckTail   string
+	TestTail    string
 	ReviewOrder string // the flows claude wrote from the diff; empty means list each unit's WHAT and DONE instead
 
 	IsMissingEnglish     bool // translation failed, so the risk section opens with "no English block"

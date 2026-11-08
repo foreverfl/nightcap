@@ -10,7 +10,7 @@ var sectionTypes = []string{"feat", "fix", "test", "docs", "refactor", "chore"}
 // marks maps each reading mark written before a heading's type to its Mark.
 var marks = map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👤": MarkPerson}
 
-var checkNames = []string{"hurl", "go test", "make check", "cargo test", "npm test"}
+var testNames = []string{"hurl", "go test", "make check", "cargo test", "npm test"}
 
 // Parse returns every "type: title (slug)" heading in a plan file with its open units, in file order.
 // Headings without a known type or a slug are skipped together with the units under them.
@@ -25,7 +25,7 @@ func Parse(text string) []PR {
 			return
 		}
 		current.Body = strings.TrimRight(current.Body, "\n")
-		current.HasCheck = hasCheck(current.Body)
+		current.HasTest = hasTest(current.Body)
 		last := &sections[len(sections)-1]
 		last.Commits = append(last.Commits, *current)
 		current = nil
@@ -85,7 +85,7 @@ func Pick(sections []PR) (PR, bool) {
 			continue
 		}
 		for _, unit := range section.Commits {
-			if unit.HasCheck {
+			if unit.HasTest {
 				return section, true
 			}
 		}
@@ -132,14 +132,14 @@ func isIndented(line string) bool {
 	return strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")
 }
 
-// hasCheck reports whether the unit's DONE line names one of checkNames.
-func hasCheck(body string) bool {
+// hasTest reports whether the unit's DONE line names one of testNames.
+func hasTest(body string) bool {
 	for _, line := range strings.Split(body, "\n") {
 		doneLine, isDone := strings.CutPrefix(strings.TrimSpace(line), "- DONE")
 		if !isDone {
 			continue
 		}
-		for _, name := range checkNames {
+		for _, name := range testNames {
 			if strings.Contains(doneLine, name) {
 				return true
 			}

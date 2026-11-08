@@ -13,7 +13,7 @@ func TestBuildBodyListsUnitsAndTheReadCodeReason(t *testing.T) {
 			{What: "피드 목록", Done: "go test ./internal/feed 통과"},
 			{What: "피드 화면", Done: "go test . 통과", ReadCodeReason: "outside WHERE: main.go"},
 		},
-		CheckTail: "ok  nightcap 0.9s",
+		TestTail: "ok  nightcap 0.9s",
 	})
 	if err != nil {
 		t.Fatal(err)

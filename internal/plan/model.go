@@ -37,9 +37,9 @@ func (section PR) IsPerson() bool {
 
 // Unit is one open checkbox under a Section; it becomes one commit.
 type Commit struct {
-	Title    string
-	Body     string // the checkbox line plus its indented lines, fences included
-	HasCheck bool   // the DONE line names a check, so a night run may take it
+	Title   string
+	Body    string // the checkbox line plus its indented lines, fences included
+	HasTest bool   // the DONE line names a check, so a night run may take it
 }
 
 // Meta is the plan file's frontmatter: which repo the plan runs in and how its units are tested.

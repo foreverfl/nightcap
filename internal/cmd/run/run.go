@@ -127,14 +127,14 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", planPath, branch, worktreeDir)
 	for _, commit := range planPR.Commits {
 		mark := "skip"
-		if commit.HasCheck {
+		if commit.HasTest {
 			mark = "take"
 		}
 		fmt.Fprintf(stdout, "  %s  %s\n", mark, commit.Title)
 	}
 
 	for index, commit := range planPR.Commits {
-		if !commit.HasCheck {
+		if !commit.HasTest {
 			continue
 		}
 		// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
@@ -206,16 +206,16 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 			break
 		}
 		// 1. Check: run the check command from nightcap.yml (tests pass or not)
-		checked, err := test.Run(ctx, worktreeDir, meta.Test)
+		tested, err := test.Run(ctx, worktreeDir, meta.Test)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
-		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: commit.Title, Result: color(checked.Green)})
-		failure := checked.Tail
-		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
+		fmt.Fprintf(stdout, "  test: %s\n", color(tested.Green))
+		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: commit.Title, Result: color(tested.Green)})
+		failure := tested.Tail
+		record.Result, record.Reason, record.TestTail = "red", "", tested.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
-		if checked.Green {
+		if tested.Green {
 			verdict, err := classifyBranch(stdout, worktreeDir, base, meta, commit)
 			if err != nil {
 				return err
@@ -385,7 +385,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 // bodyInput collects the PR description's values: planPR's summary, every unit of planPR that ended green or read-code
 // in savedPR, in plan order, and the last check tail of lastCommitTitle.
 func bodyInput(planPR plan.PR, savedPR state.PR, lastCommitTitle string) pr.BodyInput {
-	input := pr.BodyInput{Summary: planPR.Summary, CheckTail: savedPR.Commits[lastCommitTitle].CheckTail}
+	input := pr.BodyInput{Summary: planPR.Summary, TestTail: savedPR.Commits[lastCommitTitle].TestTail}
 	for _, commit := range planPR.Commits {
 		record := savedPR.Commits[commit.Title]
 		if record.Result != "green" && record.Result != "read-code" {

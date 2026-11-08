@@ -112,7 +112,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 		"  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed"),
 		"  take  add it",
 		"  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/unit1-round1.log") + ")",
-		"  check: green",
+		"  test: green",
 		"  added lines: 0",
 		"  verdict: green",
 		"  PR: https://github.com/foreverfl/feed/pull/1",
@@ -139,7 +139,7 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 	if len(logs) != 2 {
 		t.Fatalf("max_rounds 2 should leave 2 round logs, got %d: %v", len(logs), logs)
 	}
-	if !strings.HasSuffix(stdout.String(), "  check: red\n  blocked\n") {
+	if !strings.HasSuffix(stdout.String(), "  test: red\n  blocked\n") {
 		t.Fatalf("stdout should end with a red check and blocked, got %q", stdout.String())
 	}
 }
@@ -400,7 +400,7 @@ func TestLintPlanWithoutTypedHeadingExits1(t *testing.T) {
 
 func TestLintUnitWithoutCheckExits1(t *testing.T) {
 	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "go test ./... passes", "테스트가 없음", 1))
-	want := "heading: feat: a (b)\n  no check: read the docs\n"
+	want := "heading: feat: a (b)\n  no test: read the docs\n"
 	if code != 1 || stdout != want {
 		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
 	}

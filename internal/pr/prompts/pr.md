@@ -31,5 +31,5 @@
 
 ## Verified
 ```
-{{.CheckTail}}
+{{.TestTail}}
 ```
