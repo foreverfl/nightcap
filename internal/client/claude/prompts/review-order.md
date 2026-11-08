@@ -10,12 +10,12 @@
 
 예시:
 
-흐름 1. 실행을 시작할 때: 오늘 밤 할 제목과 그 base를 정한다
+흐름 1. 실행을 시작할 때: 오늘 밤 할 PR과 그 base를 정한다
 
 ```text
 nightcap run                                   터미널에서 실행
 → main.go main: 첫 인자가 run이면 run.Run
-→ internal/cmd/run/run.go Run: 제목을 위에서부터 훑는다
+→ internal/cmd/run/run.go Run: PR을 위에서부터 훑는다
 → internal/pr/view.go ViewBranch → gh pr view <branch> --json state,url
 ← internal/state/store.go SavePRStatus: 받은 상태와 URL을 .nightcap/state.json에 적는다
 ```

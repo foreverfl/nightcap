@@ -49,7 +49,7 @@ func TestUsageStopReason(t *testing.T) {
 	}
 }
 
-func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
+func TestRunCommitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 	repo := t.TempDir()
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main", repo},
@@ -87,12 +87,12 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 	statePath := filepath.Join(repo, ".nightcap", "state.json")
 	loaded := config.Config{MaxRounds: 3}
 	meta := plan.Meta{Repo: repo, Test: "true"}
-	unit := plan.Unit{Title: "add it"}
-	if err := runUnit(context.Background(), io.Discard, loaded, meta, repo, "main", "feed", 1, unit, statePath, filepath.Join(repo, ".nightcap", "runs", "run.jsonl")); err != nil {
+	commit := plan.Commit{Title: "add it"}
+	if err := runCommit(context.Background(), io.Discard, loaded, meta, repo, "main", "feed", 1, commit, statePath, filepath.Join(repo, ".nightcap", "runs", "run.jsonl")); err != nil {
 		t.Fatal(err)
 	}
 	saved, _ := state.Load(statePath)
-	got := saved.Sections["feed"].Units["add it"]
+	got := saved.PRs["feed"].Commits["add it"]
 	reset := time.Date(2099, 1, 1, 4, 30, 0, 0, time.FixedZone("JST", 9*60*60))
 	if got.Attempts != 2 || got.Result != "green" || !sleptUntil.Equal(reset) {
 		t.Fatalf("got %+v, slept until %v; want 2 rounds, green, slept until %v", got, sleptUntil, reset)
@@ -103,25 +103,25 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 }
 
 func TestBuildPromptLeavesTheRulesOutOfAResumedSession(t *testing.T) {
-	if !strings.Contains(BuildPrompt("add it", "", false), unitRules) {
-		t.Fatal("a new session should get the unit rules")
+	if !strings.Contains(BuildPrompt("add it", "", false), commitRules) {
+		t.Fatal("a new session should get the commit rules")
 	}
-	if strings.Contains(BuildPrompt("add it", "FAIL", true), unitRules) {
-		t.Fatal("a resumed session already has the unit rules")
+	if strings.Contains(BuildPrompt("add it", "FAIL", true), commitRules) {
+		t.Fatal("a resumed session already has the commit rules")
 	}
 }
 
-func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
+func TestPRSummaryCountsGreenCommitsAndTakesThePRLink(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
-	if err := state.SaveUnit(statePath, "feed-hurl", "list feeds", state.Unit{Result: "green"}); err != nil {
+	if err := state.SaveCommit(statePath, "feed-hurl", "list feeds", state.Commit{Result: "green"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.SavePRStatus(statePath, "feed-hurl", "https://github.com/foreverfl/blog-v2/pull/41", "OPEN"); err != nil {
 		t.Fatal(err)
 	}
-	section := plan.Section{Mark: plan.MarkAuto, Type: "test", Title: "피드 hurl 파일", Slug: "feed-hurl",
-		Units: []plan.Unit{{Title: "list feeds"}, {Title: "add a feed"}, {Title: "delete a feed"}}}
-	got, err := prSummary(statePath, section)
+	planPR := plan.PR{Mark: plan.MarkAuto, Type: "test", Title: "피드 hurl 파일", Slug: "feed-hurl",
+		Commits: []plan.Commit{{Title: "list feeds"}, {Title: "add a feed"}, {Title: "delete a feed"}}}
+	got, err := prSummary(statePath, planPR)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	started := time.Date(2026, 11, 8, 23, 0, 0, 0, time.UTC)
-	section := plan.Section{Slug: "feed-hurl", Units: []plan.Unit{{Title: "list feeds"}}}
+	planPR := plan.PR{Slug: "feed-hurl", Commits: []plan.Commit{{Title: "list feeds"}}}
 	for _, tc := range []struct {
 		updatedAt time.Time
 		want      string
@@ -142,13 +142,13 @@ func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
 		{started.Add(time.Hour), "session 85% ≥ 80"},
 		{started.Add(-24 * time.Hour), ""},
 	} {
-		saved := state.State{Sections: map[string]state.Section{"feed-hurl": {Units: map[string]state.Unit{
+		saved := state.State{PRs: map[string]state.PR{"feed-hurl": {Commits: map[string]state.Commit{
 			"list feeds": {Result: "stopped", Reason: "session 85% ≥ 80", UpdatedAt: tc.updatedAt},
 		}}}}
 		if err := state.Save(statePath, saved); err != nil {
 			t.Fatal(err)
 		}
-		if got := stopReason(statePath, section, started); got != tc.want {
+		if got := stopReason(statePath, planPR, started); got != tc.want {
 			t.Fatalf("stopped at %v: got %q, want %q", tc.updatedAt, got, tc.want)
 		}
 	}

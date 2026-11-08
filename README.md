@@ -1,10 +1,10 @@
 # nightcap
 
-Runs Claude Code overnight against one heading of a plan file, one unit at a time, and opens a PR that a person merges in the morning.
+Runs Claude Code overnight against one PR of a plan file, one commit at a time, and opens a PR that a person merges in the morning.
 
 - Contract files are create-only: the agent may add a test, a hurl or a spec, never edit or delete one.
 - Dependencies are yours: a change to go.mod, Cargo.toml or package.json is a red run, not a PR.
-- The heading picks the label: `🤖` auto-merges (`nightcap:auto`), `📄` read the PR (`nightcap:read-pr`), `👤` a person does it. What nightcap notices at night goes into the risk list, not the label.
+- The PR's mark picks the label: `🤖` auto-merges (`nightcap:auto`), `📄` read the PR (`nightcap:read-pr`), `👤` a person does it. What nightcap notices at night goes into the risk list, not the label.
 
 ## Setup
 
@@ -15,7 +15,7 @@ Put this at the top of your plan file. All four keys are required; write `[]` fo
 ```yaml
 ---
 repo: ~/workspace/apps-web/blog-v2
-test: make check                                         # the check every unit must pass
+test: make check                                         # the test every commit must pass
 protected: ["*.tsp", "*.hurl", "*_test.go", "Makefile"]  # contract files the agent may add but not edit or delete
 dependencies: [go.mod, go.sum]                           # dependency files the agent may not touch
 ---
@@ -29,7 +29,7 @@ Then run it from that folder with the plan file:
 nightcap run ~/work/todolist/blog-v2/commit-bot.md
 ```
 
-Before the first 🤖 heading, turn auto-merge on in the repo once. With `merge_method: rebase`, allow rebase merges too:
+Before the first 🤖 PR, turn auto-merge on in the repo once. With `merge_method: rebase`, allow rebase merges too:
 
 ```sh
 gh repo edit <owner>/<repo> --enable-auto-merge --enable-rebase-merge

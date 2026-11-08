@@ -1,4 +1,4 @@
-package check
+package verdict
 
 import (
 	"path"
@@ -7,9 +7,9 @@ import (
 	"nightcap/internal/git"
 )
 
-// Verdict is what the branch's changes say about a green unit; Red means the commit is not accepted,
+// Result is what the branch's changes say about a commit whose test passed; Red means the commit is not accepted,
 // ReadCode means it is accepted but the PR needs its code read.
-type Verdict struct {
+type Result struct {
 	Red      bool
 	ReadCode bool
 	Reason   string
@@ -47,32 +47,32 @@ var skipCallsAtLineStart = []string{
 // A newly added file whose path contains this word is treated as a database migration.
 const migrationPathWord = "migration"
 
-// Classify returns a red Verdict when a change touches one of dependencies, modifies or deletes an existing
+// Classify returns a red Result when a change touches one of dependencies, modifies or deletes an existing
 // file matching protected (adding a new one is allowed), or an added line carries a skip marker; past those, a ReadCode
-// one when a change adds a migration or sits outside wherePaths. Otherwise an empty Verdict.
-func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, protected, dependencies []string) Verdict {
+// one when a change adds a migration or sits outside wherePaths. Otherwise an empty Result.
+func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, protected, dependencies []string) Result {
 	for _, change := range changes {
 		if matchesAny(change.Path, dependencies) {
-			return Verdict{Red: true, Reason: "changed a dependency file: " + change.Path}
+			return Result{Red: true, Reason: "changed a dependency file: " + change.Path}
 		}
 		if change.Status != "A" && matchesAny(change.Path, protected) {
-			return Verdict{Red: true, Reason: "edited a contract file: " + change.Path}
+			return Result{Red: true, Reason: "edited a contract file: " + change.Path}
 		}
 	}
 	for _, line := range addedLines {
 		if hasSkipMarker(line.Text) {
-			return Verdict{Red: true, Reason: "added a skip marker in " + line.Path + ": " + strings.TrimSpace(line.Text)}
+			return Result{Red: true, Reason: "added a skip marker in " + line.Path + ": " + strings.TrimSpace(line.Text)}
 		}
 	}
 	for _, change := range changes {
 		if change.Status == "A" && strings.Contains(change.Path, migrationPathWord) {
-			return Verdict{ReadCode: true, Reason: "added a migration: " + change.Path}
+			return Result{ReadCode: true, Reason: "added a migration: " + change.Path}
 		}
 		if !isInsideWhere(change.Path, wherePaths) {
-			return Verdict{ReadCode: true, Reason: "outside WHERE: " + change.Path}
+			return Result{ReadCode: true, Reason: "outside WHERE: " + change.Path}
 		}
 	}
-	return Verdict{}
+	return Result{}
 }
 
 // isInsideWhere reports whether filePath is one of wherePaths, sits under one of them as a folder,

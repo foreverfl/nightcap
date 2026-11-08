@@ -1,8 +1,8 @@
-package check
+package verdict
 
 import "strings"
 
-// WherePaths returns the paths on a unit body's "- WHERE" line, split on "," "·" "|" outside braces,
+// WherePaths returns the paths on a commit body's "- WHERE" line, split on "," "·" "|" outside braces,
 // with "dir/{a.go, b.go}" expanded and parenthesized notes and backticks dropped.
 // It returns nil when the body has no WHERE line.
 func WherePaths(body string) []string {

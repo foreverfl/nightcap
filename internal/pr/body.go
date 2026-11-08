@@ -12,21 +12,21 @@ var bodyTemplateText string
 
 var bodyTemplate = template.Must(template.New("pr").Parse(bodyTemplateText))
 
-// BodyUnit is one finished unit as the PR description lists it; ReadCodeReason is empty unless its verdict was read-code.
-type BodyUnit struct {
+// BodyCommit is one finished commit as the PR description lists it; ReadCodeReason is empty unless its verdict was read-code.
+type BodyCommit struct {
 	What           string
 	Done           string
 	ReadCodeReason string
 }
 
-// BodyInput is everything the PR description is built from: the line under the heading, the finished units,
+// BodyInput is everything the PR description is built from: the line under the ## line, the finished commits,
 // the lines RiskLines picked from the diff, the flows ReviewOrder wrote and the last check's tail.
 type BodyInput struct {
 	Summary     string
-	Units       []BodyUnit
+	Commits     []BodyCommit
 	Risks       []string
-	CheckTail   string
-	ReviewOrder string // the flows claude wrote from the diff; empty means list each unit's WHAT and DONE instead
+	TestTail    string
+	ReviewOrder string // the flows claude wrote from the diff; empty means list each commit's WHAT and DONE instead
 
 	IsMissingEnglish     bool // translation failed, so the risk section opens with "no English block"
 	IsMissingReviewOrder bool // claude could not write the review order, so the risk section says "no review order"
@@ -34,7 +34,7 @@ type BodyInput struct {
 
 // HasNoRisk reports whether the risk section would be empty: no missing English or review order, no read-code reason and no risk line.
 func (input BodyInput) HasNoRisk() bool {
-	hasReadCode := slices.ContainsFunc(input.Units, func(unit BodyUnit) bool { return unit.ReadCodeReason != "" })
+	hasReadCode := slices.ContainsFunc(input.Commits, func(commit BodyCommit) bool { return commit.ReadCodeReason != "" })
 	return !input.IsMissingEnglish && !input.IsMissingReviewOrder && !hasReadCode && len(input.Risks) == 0
 }
 

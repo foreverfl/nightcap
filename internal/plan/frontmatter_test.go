@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// withFrontmatter is a one-heading plan under a frontmatter naming every Meta field.
+// withFrontmatter is a one-PR plan under a frontmatter naming every Meta field.
 const withFrontmatter = `---
 repo: ~/workspace/apps-web/blog-v2
 test: make check
@@ -33,13 +33,13 @@ func TestParseMetaReadsTheFrontmatter(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(meta, want) {
 		t.Fatalf("got %+v, %v; want %+v", meta, err, want)
 	}
-	if sections := Parse(withFrontmatter); len(sections) != 1 || sections[0].Slug != "feed" {
-		t.Fatalf("the frontmatter should leave the headings as they were, got %+v", sections)
+	if planPRs := Parse(withFrontmatter); len(planPRs) != 1 || planPRs[0].Slug != "feed" {
+		t.Fatalf("the frontmatter should leave the PRs as they were, got %+v", planPRs)
 	}
 }
 
 func TestParseMetaWithoutFrontmatterIsEmpty(t *testing.T) {
-	if meta, err := ParseMeta(oneSection()); err != nil || !reflect.DeepEqual(meta, Meta{}) {
+	if meta, err := ParseMeta(onePR()); err != nil || !reflect.DeepEqual(meta, Meta{}) {
 		t.Fatalf("got %+v, %v; want an empty Meta", meta, err)
 	}
 }

@@ -6,14 +6,14 @@ import (
 	"testing"
 )
 
-func TestBuildBodyListsUnitsAndTheReadCodeReason(t *testing.T) {
+func TestBuildBodyListsCommitsAndTheReadCodeReason(t *testing.T) {
 	body, err := BuildBody(BodyInput{
 		Summary: "피드를 보여 준다",
-		Units: []BodyUnit{
+		Commits: []BodyCommit{
 			{What: "피드 목록", Done: "go test ./internal/feed 통과"},
 			{What: "피드 화면", Done: "go test . 통과", ReadCodeReason: "outside WHERE: main.go"},
 		},
-		CheckTail: "ok  nightcap 0.9s",
+		TestTail: "ok  nightcap 0.9s",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -77,9 +77,9 @@ func TestBuildBilingualBodyWithoutTranslationSaysEnglishIsMissing(t *testing.T) 
 	}
 }
 
-func TestBuildBodyPutsTheReviewOrderInPlaceOfTheUnitList(t *testing.T) {
+func TestBuildBodyPutsTheReviewOrderInPlaceOfTheCommitList(t *testing.T) {
 	body, err := BuildBody(BodyInput{
-		Units:       []BodyUnit{{What: "피드 목록", Done: "go test 통과"}},
+		Commits:     []BodyCommit{{What: "피드 목록", Done: "go test 통과"}},
 		ReviewOrder: "흐름 1. 실행할 때: 피드를 읽는다",
 	})
 	if err != nil {
@@ -89,7 +89,7 @@ func TestBuildBodyPutsTheReviewOrderInPlaceOfTheUnitList(t *testing.T) {
 		t.Fatalf("the review order should sit under ## Review order, got:\n%s", body)
 	}
 	if strings.Contains(body, "- 피드 목록: go test 통과") {
-		t.Fatalf("with a review order the unit list should be gone, got:\n%s", body)
+		t.Fatalf("with a review order the commit list should be gone, got:\n%s", body)
 	}
 }
 

@@ -11,9 +11,9 @@ import (
 type Event struct {
 	Kind      string    `json:"kind"` // run_start, run_end, commit_start, round, test, verdict, blocked or pr_open
 	At        time.Time `json:"at"`
-	PR        string    `json:"pr,omitempty"`         // the heading's slug: one heading is one PR
-	Commit    string    `json:"commit,omitempty"`     // the unit's title: one unit is one commit
-	Round     int       `json:"round,omitempty"`      // which round of the unit, from 1
+	PR        string    `json:"pr,omitempty"`         // the slug of the plan's ## line: one ## is one PR
+	Commit    string    `json:"commit,omitempty"`     // the title of its - [ ] line: one - [ ] is one commit
+	Round     int       `json:"round,omitempty"`      // which round of the commit, from 1
 	Seconds   int       `json:"seconds,omitempty"`    // how long claude took on a round
 	SessionID string    `json:"session_id,omitempty"` // claude's session, on a round
 	Result    string    `json:"result,omitempty"`     // a test's green or red; a verdict's green, read-code or red
