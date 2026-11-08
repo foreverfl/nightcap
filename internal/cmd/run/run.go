@@ -149,7 +149,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath, runPath); err != nil {
 			return err
 		}
-		if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
+		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
 			return err
 		}
 		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, section); err != nil {
@@ -225,6 +225,9 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 				if verdict.ReadCode {
 					record.Result = "read-code"
 				}
+			}
+			appendEvent(runPath, events.Event{Kind: "verdict", At: time.Now(), PR: slug, Commit: unit.Title, Result: record.Result, Reason: verdict.Reason})
+			if !verdict.Red {
 				return state.SaveUnit(statePath, slug, unit.Title, record)
 			}
 			failure = verdict.Reason
@@ -239,6 +242,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 		failureTail = failure
 	}
 	fmt.Fprintln(stdout, "  blocked")
+	appendEvent(runPath, events.Event{Kind: "blocked", At: time.Now(), PR: slug, Commit: unit.Title})
 	record.Result = "blocked"
 	return state.SaveUnit(statePath, slug, unit.Title, record)
 }
@@ -318,8 +322,9 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 
 // openPR pushes section's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
 // then opens a PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
-// isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack. It returns an error when git, gh or the state file fails.
-func openPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
+// isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack, and a pr_open line goes into the run file at runPath.
+// It returns an error when git, gh or the state file fails.
+func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -367,6 +372,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base,
 		return err
 	}
 	fmt.Fprintf(stdout, "  PR: %s\n", prURL)
+	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: section.Slug, Commit: unitTitle, URL: prURL})
 	if previousURL != "" {
 		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
 			return err
