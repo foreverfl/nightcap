@@ -70,7 +70,7 @@ func TestParseSkipsHeadingWithoutType(t *testing.T) {
 func TestPickSkipsSectionWithoutCheckableUnit(t *testing.T) {
 	manual := strings.Replace(oneSection(), "go test ./internal/feed passes", "read it by hand", 1)
 	second := strings.Replace(oneSection(), "(home-feed)", "(home-feed-2)", 1)
-	section, ok := Pick(Parse(manual+"\n"+second))
+	section, ok := Pick(Parse(manual + "\n" + second))
 	if !ok || section.Slug != "home-feed-2" {
 		t.Fatalf("got %q, %v; want home-feed-2", section.Slug, ok)
 	}

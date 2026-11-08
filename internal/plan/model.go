@@ -21,7 +21,7 @@ func (mark Mark) Emoji() string {
 }
 
 // Section is one "## mark type: title (slug)" heading; it becomes one branch and one PR.
-type Section struct {
+type PR struct {
 	Mark    Mark
 	Type    string // feat, fix, test, docs, refactor or chore
 	Title   string
@@ -31,7 +31,7 @@ type Section struct {
 }
 
 // IsPerson reports whether a person does this PR by hand, so a night run never takes it.
-func (section Section) IsPerson() bool {
+func (section PR) IsPerson() bool {
 	return section.Mark == MarkPerson
 }
 

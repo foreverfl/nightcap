@@ -119,7 +119,7 @@ func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 	if err := state.SavePRStatus(statePath, "feed-hurl", "https://github.com/foreverfl/blog-v2/pull/41", "OPEN"); err != nil {
 		t.Fatal(err)
 	}
-	section := plan.Section{Mark: plan.MarkAuto, Type: "test", Title: "피드 hurl 파일", Slug: "feed-hurl",
+	section := plan.PR{Mark: plan.MarkAuto, Type: "test", Title: "피드 hurl 파일", Slug: "feed-hurl",
 		Units: []plan.Unit{{Title: "list feeds"}, {Title: "add a feed"}, {Title: "delete a feed"}}}
 	got, err := prSummary(statePath, section)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	started := time.Date(2026, 11, 8, 23, 0, 0, 0, time.UTC)
-	section := plan.Section{Slug: "feed-hurl", Units: []plan.Unit{{Title: "list feeds"}}}
+	section := plan.PR{Slug: "feed-hurl", Units: []plan.Unit{{Title: "list feeds"}}}
 	for _, tc := range []struct {
 		updatedAt time.Time
 		want      string

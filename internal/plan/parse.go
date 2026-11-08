@@ -14,8 +14,8 @@ var checkNames = []string{"hurl", "go test", "make check", "cargo test", "npm te
 
 // Parse returns every "type: title (slug)" heading in a plan file with its open units, in file order.
 // Headings without a known type or a slug are skipped together with the units under them.
-func Parse(text string) []Section {
-	var sections []Section
+func Parse(text string) []PR {
+	var sections []PR
 	var current *Unit
 	underTypedHeading := false
 	inFence := false
@@ -79,7 +79,7 @@ func Parse(text string) []Section {
 }
 
 // Pick returns the first section that has a unit a night run can take, never one marked 👤 or not marked at all; ok is false when none matches.
-func Pick(sections []Section) (Section, bool) {
+func Pick(sections []PR) (PR, bool) {
 	for _, section := range sections {
 		if section.IsPerson() || section.Mark == MarkNone {
 			continue
@@ -90,12 +90,12 @@ func Pick(sections []Section) (Section, bool) {
 			}
 		}
 	}
-	return Section{}, false
+	return PR{}, false
 }
 
 // parseHeading splits "## 📄 feat: title (slug)" into a Section with its Mark; a heading without a mark parses with MarkNone.
 // ok is false for a heading without a known type or a slug.
-func parseHeading(line string) (Section, bool) {
+func parseHeading(line string) (PR, bool) {
 	text := strings.TrimSpace(strings.TrimLeft(line, "#"))
 	mark := MarkNone
 	if symbol, rest, found := strings.Cut(text, " "); found && marks[symbol] != MarkNone {
@@ -103,13 +103,13 @@ func parseHeading(line string) (Section, bool) {
 	}
 	sectionType, rest, found := strings.Cut(text, ": ")
 	if !found || !isSectionType(sectionType) || !strings.HasSuffix(rest, ")") {
-		return Section{}, false
+		return PR{}, false
 	}
 	open := strings.LastIndex(rest, " (")
 	if open < 0 {
-		return Section{}, false
+		return PR{}, false
 	}
-	return Section{
+	return PR{
 		Mark:  mark,
 		Type:  sectionType,
 		Title: rest[:open],

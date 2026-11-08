@@ -54,7 +54,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
 	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
-	var pickedSection *plan.Section // the heading tonight took; nil when there was none
+	var pickedSection *plan.PR // the heading tonight took; nil when there was none
 	// one file per run, under its start date: .nightcap/runs/261108/225500.jsonl
 	runPath := filepath.Join(meta.Repo, ".nightcap", "runs", started.Format("060102"), started.Format("150405")+".jsonl")
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
@@ -73,7 +73,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	if err != nil {
 		return err
 	}
-	var notBlocked []plan.Section
+	var notBlocked []plan.PR
 	hasPR := map[string]bool{}
 	baseFor := map[string]string{}
 	previousOpenBranch := ""
@@ -324,7 +324,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 // then opens a PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
 // isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack, and a pr_open line goes into the run file at runPath.
 // It returns an error when git, gh or the state file fails.
-func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
+func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, section plan.PR, unitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -383,7 +383,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 
 // bodyInput collects the PR description's values: section's summary, every unit of section that ended green or read-code
 // in sectionState, in plan order, and the last check tail of lastUnitTitle.
-func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle string) pr.BodyInput {
+func bodyInput(section plan.PR, sectionState state.Section, lastUnitTitle string) pr.BodyInput {
 	input := pr.BodyInput{Summary: section.Summary, CheckTail: sectionState.Units[lastUnitTitle].CheckTail}
 	for _, unit := range section.Units {
 		record := sectionState.Units[unit.Title]
@@ -400,7 +400,7 @@ func bodyInput(section plan.Section, sectionState state.Section, lastUnitTitle s
 }
 
 // labelWhenFinished adds, once every unit is done, the label the heading's mark names, and turns on auto-merge for 🤖.
-func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, section plan.Section) error {
+func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, section plan.PR) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -428,7 +428,7 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 
 // sendNightSummary sends the morning message: the repo, the times, when a unit ran the usage, and the picked heading's line
 // read from the state file at statePath. A failed send or an unreadable state file only prints to stderr.
-func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedSection *plan.Section, started time.Time, startUsage usage.Usage) {
+func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedSection *plan.PR, started time.Time, startUsage usage.Usage) {
 	summary := notify.Summary{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
 	if pickedSection != nil {
 		prResult, err := prSummary(statePath, *pickedSection)
@@ -455,7 +455,7 @@ func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath
 
 // prSummary reads how section's units ended in the state file at statePath: green and read-code count as done,
 // and the first other result is the failure word. It returns an error when the state file cannot be read.
-func prSummary(statePath string, section plan.Section) (notify.PR, error) {
+func prSummary(statePath string, section plan.PR) (notify.PR, error) {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return notify.PR{}, err
@@ -480,7 +480,7 @@ func prSummary(statePath string, section plan.Section) (notify.PR, error) {
 
 // stopReason returns the reason of a unit of section that the state file at statePath saved as stopped after started,
 // so a stop from an earlier night is not reported again; it returns "" when there is none or the file cannot be read.
-func stopReason(statePath string, section plan.Section, started time.Time) string {
+func stopReason(statePath string, section plan.PR, started time.Time) string {
 	saved, _ := state.Load(statePath)
 	for _, unit := range saved.Sections[section.Slug].Units {
 		if unit.Result == "stopped" && unit.UpdatedAt.After(started) {
