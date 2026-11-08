@@ -23,7 +23,7 @@ var defaultAllowedTools = []string{
 func Load(path string) (Config, error) {
 	raw, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return Config{}, fmt.Errorf("config: %s not found, copy examples/nightcap.yml there", path)
+		return Config{}, fmt.Errorf("config: %s not found, run nightcap init", path)
 	}
 	if err != nil {
 		return Config{}, err
