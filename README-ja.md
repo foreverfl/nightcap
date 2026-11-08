@@ -14,8 +14,6 @@ curl -fsSL https://raw.githubusercontent.com/foreverfl/nightcap/main/install.sh 
 
 ## 使い方
 
-`nightcap.yml` があるフォルダで実行する（設定を参照）:
-
 ```sh
 nightcap run ~/work/todolist/blog-v2/commit-bot.md     # コミットが残っている一番上の PR の、次のコミットを実行する
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # 計画のリポジトリとその worktree を表示する
@@ -56,7 +54,9 @@ Notes can be listed and added over HTTP, so the web page has something to call.
 
 ### nightcap.yml
 
-[examples/nightcap.yml](examples/nightcap.yml) をバイナリの隣に `nightcap.yml` としてコピーする（gitignore 対象）。このマシンのすべての計画が共有する設定だけを置く。
+[examples/nightcap.yml](examples/nightcap.yml) を `~/.config/nightcap/nightcap.yml` にコピーする。このマシンのすべての計画が共有する設定だけを置く。
+
+nightcap は対象リポジトリにブランチ以外何も書かない。状態とログは `~/.local/share/nightcap/<リポジトリ>`、worktree は `~/.cache/nightcap/<リポジトリ>` の下にできる。`XDG_CONFIG_HOME` · `XDG_DATA_HOME` · `XDG_CACHE_HOME` があればその下に置く。
 
 ```yaml
 work_start: "09:00"        # 空なら出勤前の制限なし。書くと、この時刻の 5 時間以内には新しい使用量ウィンドウを開かない

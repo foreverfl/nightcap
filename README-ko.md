@@ -14,8 +14,6 @@ curl -fsSL https://raw.githubusercontent.com/foreverfl/nightcap/main/install.sh 
 
 ## 사용법
 
-`nightcap.yml`이 있는 폴더에서 돌린다(설정 참고):
-
 ```sh
 nightcap run ~/work/todolist/blog-v2/commit-bot.md     # 커밋이 남은 맨 위 PR의 다음 커밋을 돌린다
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # 계획의 레포와 그 워크트리를 찍는다
@@ -56,7 +54,9 @@ HTTP로 메모를 보고 더할 수 있게 해서, 웹 화면이 부를 곳을 �
 
 ### nightcap.yml
 
-[examples/nightcap.yml](examples/nightcap.yml)을 바이너리 옆에 `nightcap.yml`로 복사한다(gitignore 대상). 이 기계에서 모든 계획이 같이 쓰는 설정만 둔다.
+[examples/nightcap.yml](examples/nightcap.yml)을 `~/.config/nightcap/nightcap.yml`로 복사한다. 이 기계에서 모든 계획이 같이 쓰는 설정만 둔다.
+
+nightcap은 대상 레포에 브랜치 말고 아무것도 쓰지 않는다. 상태와 로그는 `~/.local/share/nightcap/<레포>`, worktree는 `~/.cache/nightcap/<레포>` 밑에 생긴다. `XDG_CONFIG_HOME` · `XDG_DATA_HOME` · `XDG_CACHE_HOME`이 있으면 그 밑으로 간다.
 
 ```yaml
 work_start: "09:00"        # 비우면 출근 전 제한 없음. 적으면 이 시각 5시간 안에는 새 사용량 창을 열지 않는다

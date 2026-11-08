@@ -14,7 +14,7 @@ func loadFrom(t *testing.T, text string) (Config, error) {
 	if err := os.WriteFile(filepath.Join(dir, FileName), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return Load(dir)
+	return Load(filepath.Join(dir, FileName))
 }
 
 func TestLoadFillsDefaults(t *testing.T) {
@@ -69,7 +69,7 @@ func TestLoadReadsLimits(t *testing.T) {
 }
 
 func TestLoadReadsTheExample(t *testing.T) {
-	got, err := Load("../../examples")
+	got, err := Load("../../examples/nightcap.yml")
 	if err != nil {
 		t.Fatal(err)
 	}

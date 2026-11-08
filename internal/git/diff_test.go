@@ -24,7 +24,7 @@ func commitFile(t *testing.T, dir, name, content string) {
 }
 
 func TestChangedFilesListsOneAddedFile(t *testing.T) {
-	dir, err := AddWorktree(oneRepo(t), "main", "feat/feed", "feed")
+	dir, err := AddWorktree(oneRepo(t), "main", "feat/feed", filepath.Join(t.TempDir(), "feed"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestChangedFilesListsOneAddedFile(t *testing.T) {
 }
 
 func TestAddedLinesReturnsTheOneAddedLine(t *testing.T) {
-	dir, err := AddWorktree(oneRepo(t), "main", "feat/feed", "feed")
+	dir, err := AddWorktree(oneRepo(t), "main", "feat/feed", filepath.Join(t.TempDir(), "feed"))
 	if err != nil {
 		t.Fatal(err)
 	}

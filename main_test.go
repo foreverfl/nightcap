@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"nightcap/internal/path"
 )
 
 // setUpRepoWithOneCommitPlan moves into a temp folder with a git repo, a one-commit plan and a fake gh, and returns the repo path.
@@ -54,11 +56,18 @@ func writePlan(t *testing.T, repo, test string) {
 	}
 }
 
-// writePlanAndConfig writes commit-bot.md through writePlan, then nightcap.yml with configYAML as its whole text.
+// writePlanAndConfig writes commit-bot.md through writePlan, then nightcap.yml with configYAML under a temp XDG_CONFIG_HOME.
 func writePlanAndConfig(t *testing.T, repo, test, configYAML string) {
 	t.Helper()
 	writePlan(t, repo, test)
-	if err := os.WriteFile("nightcap.yml", []byte(configYAML), 0o644); err != nil {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	if err := os.MkdirAll(filepath.Join(configHome, "nightcap"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configHome, "nightcap", "nightcap.yml"), []byte(configYAML), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -107,9 +116,9 @@ func TestDispatchRunPrintsPickedPR(t *testing.T) {
 	want := strings.Join([]string{
 		"commit-bot.md",
 		"  branch: feat/feed",
-		"  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed"),
+		"  worktree: " + filepath.Join(cacheDir(t, repo), "worktrees/feed"),
 		"  take  add it",
-		"  ran  add it: done (log: " + filepath.Join(repo, ".nightcap/logs/feed/commit1-round1.log") + ")",
+		"  ran  add it: done (log: " + filepath.Join(dataDir(t, repo), "logs/feed/commit1-round1.log") + ")",
 		"  test: green",
 		"  added lines: 0",
 		"  verdict: green",
@@ -133,7 +142,7 @@ func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(dataDir(t, repo), "logs/feed/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("max_rounds 2 should leave 2 round logs, got %d: %v", len(logs), logs)
 	}
@@ -142,10 +151,10 @@ func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	}
 }
 
-// runFileKinds reads the one run file a run left under repo's .nightcap/runs and returns the kind of each line in order.
+// runFileKinds reads the one run file a run left under repo's data folder and returns the kind of each line in order.
 func runFileKinds(t *testing.T, repo string) []string {
 	t.Helper()
-	runFiles, _ := filepath.Glob(filepath.Join(repo, ".nightcap/runs/*/*.jsonl"))
+	runFiles, _ := filepath.Glob(filepath.Join(dataDir(t, repo), "runs/*/*.jsonl"))
 	if len(runFiles) != 1 {
 		t.Fatalf("one run should leave one run file, got %v", runFiles)
 	}
@@ -186,7 +195,7 @@ func TestRunMarksCommitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(dataDir(t, repo), "logs/feed/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("`false` fails the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -232,7 +241,7 @@ func TestRunMarksCommitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	logs, _ := filepath.Glob(filepath.Join(repo, ".nightcap/logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(dataDir(t, repo), "logs/feed/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("go.sum turns the verdict red the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -450,9 +459,29 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	first, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/commit1-round1.log"))
-	second, _ := os.ReadFile(filepath.Join(repo, ".nightcap/logs/feed/commit1-round2.log"))
+	first, _ := os.ReadFile(filepath.Join(dataDir(t, repo), "logs/feed/commit1-round1.log"))
+	second, _ := os.ReadFile(filepath.Join(dataDir(t, repo), "logs/feed/commit1-round2.log"))
 	if strings.Contains(string(first), "--resume") || !strings.Contains(string(second), "--resume s1") {
 		t.Fatalf("round 1 should start a session and round 2 resume s1\nround 1: %s\nround 2: %s", first, second)
 	}
+}
+
+// dataDir returns the folder a run writes repo's state, run files and logs to.
+func dataDir(t *testing.T, repo string) string {
+	t.Helper()
+	dir, err := path.DataDir(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// cacheDir returns the folder a run puts repo's worktrees under.
+func cacheDir(t *testing.T, repo string) string {
+	t.Helper()
+	dir, err := path.CacheDir(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }
