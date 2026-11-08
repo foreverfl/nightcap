@@ -11,8 +11,7 @@ var translateInstructions = strings.Join([]string{
 	"Keep the markdown, code, paths and identifiers as they are. Reply with the translation only.",
 }, "\n")
 
-// Translate asks claude, in one turn with no tools, to turn the Korean PR description korean into English,
-// and returns the translation. It returns an error when claude fails or does not answer with a finished result.
+// Translate asks claude to turn the Korean PR body into English and returns the translation.
 func Translate(ctx context.Context, korean string) (string, error) {
 	return askOnce(ctx, "translate", translateInstructions+"\n\n"+korean)
 }

@@ -11,9 +11,8 @@ import (
 	"strings"
 )
 
-// RunRound runs one `claude -p` round inside worktreeDir and writes its stdout and stderr to logPath;
-// a non-empty sessionID resumes that conversation instead of starting a new one.
-// It returns an error when claude cannot start, the log cannot be written, or the output is not a result JSON.
+// RunRound runs one `claude -p` round in worktreeDir, writing its output to logPath; a non-empty sessionID resumes that conversation.
+// It fails when claude cannot start, the log cannot be written, or the output is not a result JSON.
 func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTurns int, allowedTools []string, logPath string) (Result, error) {
 	command := exec.CommandContext(ctx, claudeBinary(),
 		"-p", prompt,

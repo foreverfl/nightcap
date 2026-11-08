@@ -95,8 +95,7 @@ func Pick(planPRs []PR) (PR, bool) {
 	return PR{}, false
 }
 
-// parsePRLine splits "## 📄 feat: title (slug)" into a PR with its Mark; a line without a mark parses with MarkNone.
-// ok is false for a line without a known type or a slug.
+// parsePRLine splits "## 📄 feat: title (slug)" into a PR; ok is false without a known type or a slug.
 func parsePRLine(line string) (PR, bool) {
 	text := strings.TrimSpace(strings.TrimLeft(line, "#"))
 	mark := MarkNone

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Outcome is how one claude round ended, before the check runs.
+// Outcome is how one claude round ended, before the test runs.
 type Outcome string
 
 const (
@@ -23,7 +23,6 @@ type Result struct {
 }
 
 // ParseResult reads the JSON that `claude -p --output-format json` prints.
-// It returns an error when the output is not that JSON.
 func ParseResult(raw []byte) (Result, error) {
 	var output struct {
 		Type           string `json:"type"`

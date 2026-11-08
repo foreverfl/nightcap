@@ -8,7 +8,6 @@ import (
 )
 
 // askOnce runs claude on prompt in one turn with no tools and returns its answer; callName names the call in errors.
-// It returns an error when claude fails or does not answer with a finished result.
 func askOnce(ctx context.Context, callName, prompt string) (string, error) {
 	command := exec.CommandContext(ctx, claudeBinary(), "-p", prompt, "--max-turns", "1", "--output-format", "json")
 	output, err := command.Output()
