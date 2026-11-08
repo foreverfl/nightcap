@@ -18,6 +18,12 @@ func DataDir(repo string) (string, error) {
 	return filepath.Join(base, "nightcap", filepath.Base(repo)), err
 }
 
+// CacheDir returns $XDG_CACHE_HOME/nightcap/<repo folder name>, or ~/.cache/nightcap/<repo folder name> when it is unset.
+func CacheDir(repo string) (string, error) {
+	base, err := baseDir("XDG_CACHE_HOME", ".cache")
+	return filepath.Join(base, "nightcap", filepath.Base(repo)), err
+}
+
 // baseDir returns the folder the env variable names, or homeFolder under the home folder when it is unset.
 func baseDir(env, homeFolder string) (string, error) {
 	if base := os.Getenv(env); base != "" {

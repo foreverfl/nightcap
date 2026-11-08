@@ -1,6 +1,7 @@
 package git
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -23,7 +24,7 @@ func oneRepo(t *testing.T) string {
 
 func TestAddWorktreeCreatesBranchFolder(t *testing.T) {
 	repo := oneRepo(t)
-	dir, err := AddWorktree(repo, "main", "feat/feed", "feed")
+	dir, err := AddWorktree(repo, "main", "feat/feed", filepath.Join(repo, ".nightcap", "worktrees", "feed"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,17 +38,17 @@ func TestAddWorktreeCreatesBranchFolder(t *testing.T) {
 
 func TestAddWorktreeReusesExistingFolder(t *testing.T) {
 	repo := oneRepo(t)
-	if _, err := AddWorktree(repo, "main", "feat/feed", "feed"); err != nil {
+	if _, err := AddWorktree(repo, "main", "feat/feed", filepath.Join(repo, ".nightcap", "worktrees", "feed")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := AddWorktree(repo, "main", "feat/feed", "feed"); err != nil {
+	if _, err := AddWorktree(repo, "main", "feat/feed", filepath.Join(repo, ".nightcap", "worktrees", "feed")); err != nil {
 		t.Fatalf("second add: %v", err)
 	}
 }
 
 func TestListWorktreesShowsAddedOne(t *testing.T) {
 	repo := oneRepo(t)
-	if _, err := AddWorktree(repo, "main", "feat/feed", "feed"); err != nil {
+	if _, err := AddWorktree(repo, "main", "feat/feed", filepath.Join(repo, ".nightcap", "worktrees", "feed")); err != nil {
 		t.Fatal(err)
 	}
 	lines, err := ListWorktrees(repo)
@@ -56,5 +57,22 @@ func TestListWorktreesShowsAddedOne(t *testing.T) {
 	}
 	if len(lines) != 2 {
 		t.Fatalf("got %d worktrees, want 2: %q", len(lines), lines)
+	}
+}
+
+func TestRemoveWorktreeDeletesTheFolder(t *testing.T) {
+	repo := oneRepo(t)
+	dir, err := AddWorktree(repo, "main", "feat/feed", filepath.Join(t.TempDir(), "feed"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RemoveWorktree(repo, dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("%s should be gone, stat err = %v", dir, err)
+	}
+	if lines, _ := ListWorktrees(repo); len(lines) != 1 {
+		t.Fatalf("got %d worktrees, want 1: %q", len(lines), lines)
 	}
 }

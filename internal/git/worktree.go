@@ -2,14 +2,12 @@ package git
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 )
 
-// AddWorktree checks branch out in <repo>/.nightcap/worktrees/<slug> and returns that folder.
+// AddWorktree checks branch out in worktreeDir and returns that folder.
 // A new branch starts from base; an existing folder or branch is reused as it is.
-func AddWorktree(repo, base, branch, slug string) (string, error) {
-	worktreeDir := filepath.Join(repo, ".nightcap", "worktrees", slug)
+func AddWorktree(repo, base, branch, worktreeDir string) (string, error) {
 	if _, err := os.Stat(worktreeDir); err == nil {
 		return worktreeDir, nil
 	}
@@ -21,6 +19,12 @@ func AddWorktree(repo, base, branch, slug string) (string, error) {
 		return "", err
 	}
 	return worktreeDir, nil
+}
+
+// RemoveWorktree deletes the worktree at worktreeDir, uncommitted changes included; the branch stays.
+func RemoveWorktree(repo, worktreeDir string) error {
+	_, err := runGit(repo, "worktree", "remove", "--force", worktreeDir)
+	return err
 }
 
 // ListWorktrees returns one line per worktree of repo, as `git worktree list` prints them.

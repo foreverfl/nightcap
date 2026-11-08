@@ -61,6 +61,7 @@ func writePlanAndConfig(t *testing.T, repo, test, configYAML string) {
 	t.Helper()
 	writePlan(t, repo, test)
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
 	if err := os.MkdirAll(filepath.Join(configHome, "nightcap"), 0o755); err != nil {
@@ -115,7 +116,7 @@ func TestDispatchRunPrintsPickedPR(t *testing.T) {
 	want := strings.Join([]string{
 		"commit-bot.md",
 		"  branch: feat/feed",
-		"  worktree: " + filepath.Join(repo, ".nightcap/worktrees/feed"),
+		"  worktree: " + filepath.Join(cacheDir(t, repo), "worktrees/feed"),
 		"  take  add it",
 		"  ran  add it: done (log: " + filepath.Join(dataDir(t, repo), "logs/feed/commit1-round1.log") + ")",
 		"  test: green",
@@ -469,6 +470,16 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 func dataDir(t *testing.T, repo string) string {
 	t.Helper()
 	dir, err := path.DataDir(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// cacheDir returns the folder a run puts repo's worktrees under.
+func cacheDir(t *testing.T, repo string) string {
+	t.Helper()
+	dir, err := path.CacheDir(repo)
 	if err != nil {
 		t.Fatal(err)
 	}

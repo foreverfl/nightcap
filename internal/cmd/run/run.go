@@ -62,6 +62,11 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		return err
 	}
 	statePath := filepath.Join(dataDir, "state.json")
+	cacheDir, err := path.CacheDir(meta.Repo)
+	if err != nil {
+		return err
+	}
+	worktreesDir := filepath.Join(cacheDir, "worktrees")
 	var pickedPR *plan.PR // the PR tonight took; nil when there was none
 	// one file per run, under its start date: ~/.local/share/nightcap/blog-v2/runs/261108/225500.jsonl
 	runPath := filepath.Join(dataDir, "runs", started.Format("060102"), started.Format("150405")+".jsonl")
@@ -108,6 +113,9 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 				return err
 			}
 			if view.State == "MERGED" || view.State == "CLOSED" {
+				if err := removeWorktreeIfAny(stdout, meta.Repo, filepath.Join(worktreesDir, planPR.Slug), planPR.Slug, view.State); err != nil {
+					return err
+				}
 				fmt.Fprintf(stdout, "skip %s: PR %s\n", planPR.Title, strings.ToLower(view.State))
 				continue
 			}
@@ -127,7 +135,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	pickedPR = &planPR
 	base := baseFor[planPR.Slug]
 	branch := planPR.Type + "/" + planPR.Slug
-	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, planPR.Slug)
+	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, filepath.Join(worktreesDir, planPR.Slug))
 	if err != nil {
 		return err
 	}
@@ -490,4 +498,16 @@ func appendEvent(path string, event events.Event) {
 	if err := events.Append(path, event); err != nil {
 		fmt.Fprintln(os.Stderr, "events:", err)
 	}
+}
+
+// removeWorktreeIfAny deletes the PR's worktree once gh says the PR is MERGED or CLOSED, and prints one line when there was one.
+func removeWorktreeIfAny(stdout io.Writer, repo, worktreeDir, slug, prState string) error {
+	if _, err := os.Stat(worktreeDir); err != nil {
+		return nil
+	}
+	if err := git.RemoveWorktree(repo, worktreeDir); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "removed worktree %s: PR %s\n", slug, strings.ToLower(prState))
+	return nil
 }
