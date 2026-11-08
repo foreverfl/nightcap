@@ -57,10 +57,14 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	defer stop()
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a commit, so a night that runs nothing never calls claude
-	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
+	dataDir, err := path.DataDir(meta.Repo)
+	if err != nil {
+		return err
+	}
+	statePath := filepath.Join(dataDir, "state.json")
 	var pickedPR *plan.PR // the PR tonight took; nil when there was none
-	// one file per run, under its start date: .nightcap/runs/261108/225500.jsonl
-	runPath := filepath.Join(meta.Repo, ".nightcap", "runs", started.Format("060102"), started.Format("150405")+".jsonl")
+	// one file per run, under its start date: ~/.local/share/nightcap/blog-v2/runs/261108/225500.jsonl
+	runPath := filepath.Join(dataDir, "runs", started.Format("060102"), started.Format("150405")+".jsonl")
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
 		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPR, started, startUsage)
@@ -173,7 +177,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	appendEvent(runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: commit.Title})
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
-		logPath := filepath.Join(meta.Repo, ".nightcap", "logs", slug, fmt.Sprintf("commit%d-round%d.log", number, round))
+		logPath := filepath.Join(filepath.Dir(statePath), "logs", slug, fmt.Sprintf("commit%d-round%d.log", number, round))
 		roundStarted := time.Now()
 		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {

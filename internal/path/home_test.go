@@ -20,3 +20,12 @@ func TestConfigFileFallsBackToTheHomeConfigFolder(t *testing.T) {
 		t.Fatalf("ConfigFile() = %q, want %q", got, want)
 	}
 }
+
+func TestDataDirIsNamedAfterTheRepoFolder(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", "/home/me")
+	want := filepath.Join("/home/me", ".local", "share", "nightcap", "blog-v2")
+	if got, _ := DataDir("/home/me/workspace/apps-web/blog-v2"); got != want {
+		t.Fatalf("DataDir() = %q, want %q", got, want)
+	}
+}
