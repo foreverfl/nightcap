@@ -10,9 +10,8 @@ import (
 	"nightcap/internal/plan"
 )
 
-// Run is the "status" subcommand; args is everything after "status", and its first item is the plan file.
-// It prints the repo the plan's frontmatter names with its worktrees, and returns an error
-// when no plan file is named, the plan file or its frontmatter does not read, or git fails.
+// Run prints the repo the frontmatter of the plan file args[0] names, and that repo's worktrees.
+// It fails when no plan file is named, the plan or its frontmatter does not read, or git fails.
 func Run(args []string, stdout io.Writer) error {
 	if len(args) == 0 {
 		return errors.New("status: name a plan file")

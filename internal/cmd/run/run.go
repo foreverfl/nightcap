@@ -25,10 +25,8 @@ import (
 	"nightcap/internal/verdict"
 )
 
-// Run is the "run" subcommand; args is everything after "run", and its first item is the plan file.
-// For now it picks the plan's top PR that has a commit to take, checks its branch out in a worktree of the frontmatter's repo and runs
-// the first commit that has a test through runCommit; it returns an error when no plan file is named,
-// or when the config, the plan file, git, claude or sh fails.
+// Run takes the top PR of the plan file args[0] that has a commit to run, and runs that commit in a worktree of the frontmatter's repo.
+// It fails when no plan file is named or the frontmatter leaves a key out, and when the config, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
 		return errors.New("run: name a plan file")
@@ -161,11 +159,8 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	return nil
 }
 
-// runCommit runs claude then the test on one commit up to MaxRounds times, feeding a red test's tail or a red verdict's
-// reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
-// or claude stops before Done. Every round's outcome goes into the state file at statePath,
-// and commit_start, each round and each test go as lines into the run file at runPath.
-// It returns an error only when claude, sh, git or the state file fails.
+// runCommit runs claude and the test on one commit until the test is green or MaxRounds is spent.
+// It prints "blocked" when the rounds run out, the same failure comes back twice, or claude stops before Done.
 func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, commit plan.Commit, statePath, runPath string) error {
 	failureTail := ""
 	sessionID := ""
@@ -248,8 +243,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	return state.SaveCommit(statePath, slug, commit.Title, record)
 }
 
-// usageStopReason says why no commit should start at now under loaded's limits, or "" when one may.
-// The weekly limit is skipped within 24h of its reset, and a window not open yet is taken to reset at now + 5h.
+// usageStopReason says why no commit should start now under loaded's limits, or "" when one may.
 func usageStopReason(now time.Time, current usage.Usage, loaded config.Config) string {
 	// stop 1: the 5h window is already at limit_session, so this commit could hit the limit halfway
 	if current.Known && loaded.LimitSession > 0 && current.Session.Percent >= loaded.LimitSession {
@@ -265,8 +259,7 @@ func usageStopReason(now time.Time, current usage.Usage, loaded config.Config) s
 	return afterWork
 }
 
-// windowReset returns when the 5h window resets (the time /usage reported, or now + 5h when no window is open or /usage failed),
-// and afterWork "reset 10:00 > work_start 09:00" when that is after work_start, or "".
+// windowReset returns when the 5h window resets, and afterWork such as "reset 10:00 > work_start 09:00" when that is after work_start.
 func windowReset(now time.Time, current usage.Usage, workStartHHMM string) (reset time.Time, afterWork string) {
 	reset = now.Add(5 * time.Hour)
 	if current.Session.ResetsAt.After(now) {
@@ -295,8 +288,7 @@ func color(green bool) string {
 	return "red"
 }
 
-// classifyBranch prints the files and the count of lines worktreeDir's branch changed, then the verdict on them.
-// It returns that verdict, or an error when git fails.
+// classifyBranch prints the files the branch changed and returns the verdict on them.
 func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, commit plan.Commit) (verdict.Result, error) {
 	changes, err := git.ChangedFiles(worktreeDir, base)
 	if err != nil {
@@ -321,10 +313,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 	return result, nil
 }
 
-// openPR pushes planPR's branch from worktreeDir once commitTitle has ended green or read-code in the state file at statePath,
-// then opens a PR, or with hasPR replaces its description, listing every finished commit (English above Korean when
-// isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack, and a pr_open line goes into the run file at runPath.
-// It returns an error when git, gh or the state file fails.
+// openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR, once commitTitle has ended green or read-code.
 func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
@@ -382,8 +371,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	return state.SavePRStatus(statePath, planPR.Slug, prURL, "OPEN")
 }
 
-// bodyInput collects the PR description's values: planPR's summary, every commit of planPR that ended green or read-code
-// in savedPR, in plan order, and the last test tail of lastCommitTitle.
+// bodyInput returns the PR body's values: planPR's summary and every commit that ended green or read-code.
 func bodyInput(planPR plan.PR, savedPR state.PR, lastCommitTitle string) pr.BodyInput {
 	input := pr.BodyInput{Summary: planPR.Summary, TestTail: savedPR.Commits[lastCommitTitle].TestTail}
 	for _, commit := range planPR.Commits {
@@ -427,8 +415,7 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	return nil
 }
 
-// sendNightSummary sends the morning message: the repo, the times, when a commit ran the usage, and the picked PR's line
-// read from the state file at statePath. A failed send or an unreadable state file only prints to stderr.
+// sendNightSummary sends the morning message; a failed send only prints to stderr, so it never changes the run's result.
 func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedPR *plan.PR, started time.Time, startUsage usage.Usage) {
 	summary := notify.Summary{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
 	if pickedPR != nil {
@@ -454,8 +441,7 @@ func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath
 	}
 }
 
-// prSummary reads how planPR's commits ended in the state file at statePath: green and read-code count as done,
-// and the first other result is the failure word. It returns an error when the state file cannot be read.
+// prSummary returns planPR's line for the morning message, counting green and read-code commits as done.
 func prSummary(statePath string, planPR plan.PR) (notify.PR, error) {
 	saved, err := state.Load(statePath)
 	if err != nil {
@@ -479,8 +465,7 @@ func prSummary(statePath string, planPR plan.PR) (notify.PR, error) {
 	return prResult, nil
 }
 
-// stopReason returns the reason of a commit of planPR that the state file at statePath saved as stopped after started,
-// so a stop from an earlier night is not reported again; it returns "" when there is none or the file cannot be read.
+// stopReason returns why a commit of planPR stopped after started, or "" when none did during this run.
 func stopReason(statePath string, planPR plan.PR, started time.Time) string {
 	saved, _ := state.Load(statePath)
 	for _, commit := range saved.PRs[planPR.Slug].Commits {
@@ -491,7 +476,7 @@ func stopReason(statePath string, planPR plan.PR, started time.Time) string {
 	return ""
 }
 
-// appendEvent adds event to the run file at path; a failed write only prints to stderr, so the log never stops a run.
+// appendEvent adds event to the run file; a failed write only prints to stderr, so the log never stops a run.
 func appendEvent(path string, event events.Event) {
 	if err := events.Append(path, event); err != nil {
 		fmt.Fprintln(os.Stderr, "events:", err)
