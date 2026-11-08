@@ -18,6 +18,8 @@ curl -fsSL https://raw.githubusercontent.com/foreverfl/nightcap/main/install.sh 
 nightcap run ~/work/todolist/blog-v2/commit-bot.md     # コミットが残っている一番上の PR の、次のコミットを実行する
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # 計画のリポジトリとその worktree を表示する
 nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # 夜の実行で使えないものを表示する
+nightcap init                                          # 設定の例を ~/.config/nightcap/nightcap.yml に書く
+nightcap config                                        # そのファイルを $VISUAL か $EDITOR で開く
 nightcap version
 ```
 
@@ -54,7 +56,7 @@ Notes can be listed and added over HTTP, so the web page has something to call.
 
 ### nightcap.yml
 
-[examples/nightcap.yml](examples/nightcap.yml) を `~/.config/nightcap/nightcap.yml` にコピーする。このマシンのすべての計画が共有する設定だけを置く。
+`nightcap init` が [examples/nightcap.yml](examples/nightcap.yml) を `~/.config/nightcap/nightcap.yml` に書き、`nightcap config` がそのファイルを開く。このマシンのすべての計画が共有する設定だけを置く。
 
 nightcap は対象リポジトリにブランチ以外何も書かない。状態とログは `~/.local/share/nightcap/<リポジトリ>`、worktree は `~/.cache/nightcap/<リポジトリ>` の下にできる。`XDG_CONFIG_HOME` · `XDG_DATA_HOME` · `XDG_CACHE_HOME` があればその下に置く。
 
