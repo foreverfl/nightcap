@@ -39,12 +39,12 @@ func Run(args []string, stdout io.Writer) error {
 			continue
 		}
 		fmt.Fprintf(stdout, "heading: %s: %s (%s)\n", planPR.Type, planPR.Title, planPR.Slug)
-		for _, unit := range planPR.Commits {
-			if !unit.HasCheck {
-				fmt.Fprintf(stdout, "  no check: %s\n", unit.Title)
+		for _, commit := range planPR.Commits {
+			if !commit.HasCheck {
+				fmt.Fprintf(stdout, "  no check: %s\n", commit.Title)
 				hasProblem = true
 			}
-			for _, path := range check.WherePaths(unit.Body) {
+			for _, path := range check.WherePaths(commit.Body) {
 				if canNeverMatchAChangedFile(path) {
 					fmt.Fprintf(stdout, "  WHERE path not readable: %s\n", path)
 					hasProblem = true

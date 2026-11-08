@@ -87,8 +87,8 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 	statePath := filepath.Join(repo, ".nightcap", "state.json")
 	loaded := config.Config{MaxRounds: 3}
 	meta := plan.Meta{Repo: repo, Test: "true"}
-	unit := plan.Commit{Title: "add it"}
-	if err := runUnit(context.Background(), io.Discard, loaded, meta, repo, "main", "feed", 1, unit, statePath, filepath.Join(repo, ".nightcap", "runs", "run.jsonl")); err != nil {
+	commit := plan.Commit{Title: "add it"}
+	if err := runCommit(context.Background(), io.Discard, loaded, meta, repo, "main", "feed", 1, commit, statePath, filepath.Join(repo, ".nightcap", "runs", "run.jsonl")); err != nil {
 		t.Fatal(err)
 	}
 	saved, _ := state.Load(statePath)
@@ -103,11 +103,11 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 }
 
 func TestBuildPromptLeavesTheRulesOutOfAResumedSession(t *testing.T) {
-	if !strings.Contains(BuildPrompt("add it", "", false), unitRules) {
-		t.Fatal("a new session should get the unit rules")
+	if !strings.Contains(BuildPrompt("add it", "", false), commitRules) {
+		t.Fatal("a new session should get the commit rules")
 	}
-	if strings.Contains(BuildPrompt("add it", "FAIL", true), unitRules) {
-		t.Fatal("a resumed session already has the unit rules")
+	if strings.Contains(BuildPrompt("add it", "FAIL", true), commitRules) {
+		t.Fatal("a resumed session already has the commit rules")
 	}
 }
 

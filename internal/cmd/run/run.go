@@ -26,7 +26,7 @@ import (
 
 // Run is the "run" subcommand; args is everything after "run", and its first item is the plan file.
 // For now it picks the plan's top heading that has a unit to take, checks its branch out in a worktree of the frontmatter's repo and runs
-// the first unit that has a check through runUnit; it returns an error when no plan file is named,
+// the first unit that has a check through runCommit; it returns an error when no plan file is named,
 // or when the config, the plan file, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
@@ -52,7 +52,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	started := time.Now()
-	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
+	var startUsage usage.Usage // the first /usage read before a commit, so a night that runs nothing never calls claude
 	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
 	var pickedPR *plan.PR // the heading tonight took; nil when there was none
 	// one file per run, under its start date: .nightcap/runs/261108/225500.jsonl
@@ -124,16 +124,16 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		return err
 	}
 	fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", planPath, branch, worktreeDir)
-	for _, unit := range planPR.Commits {
+	for _, commit := range planPR.Commits {
 		mark := "skip"
-		if unit.HasCheck {
+		if commit.HasCheck {
 			mark = "take"
 		}
-		fmt.Fprintf(stdout, "  %s  %s\n", mark, unit.Title)
+		fmt.Fprintf(stdout, "  %s  %s\n", mark, commit.Title)
 	}
 
-	for index, unit := range planPR.Commits {
-		if !unit.HasCheck {
+	for index, commit := range planPR.Commits {
+		if !commit.HasCheck {
 			continue
 		}
 		// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
@@ -144,12 +144,12 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		}
 		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
 			fmt.Fprintf(stdout, "  stop: %s\n", reason)
-			return state.SaveCommit(statePath, planPR.Slug, unit.Title, state.Commit{Result: "stopped", Reason: reason})
+			return state.SaveCommit(statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
-		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, unit, statePath, runPath); err != nil {
+		if err := runCommit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, commit, statePath, runPath); err != nil {
 			return err
 		}
-		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, unit.Title, hasPR[planPR.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
+		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
 			return err
 		}
 		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, planPR); err != nil {
@@ -160,30 +160,30 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	return nil
 }
 
-// runUnit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail or a red verdict's
+// runCommit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail or a red verdict's
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
 // or claude stops before Done. Every round's outcome goes into the state file at statePath,
 // and commit_start, each round and each test go as lines into the run file at runPath.
 // It returns an error only when claude, sh, git or the state file fails.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Commit, statePath, runPath string) error {
+func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, commit plan.Commit, statePath, runPath string) error {
 	failureTail := ""
 	sessionID := ""
 	record := state.Commit{}
-	appendEvent(runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: unit.Title})
+	appendEvent(runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: commit.Title})
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
 		logPath := filepath.Join(meta.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
 		roundStarted := time.Now()
-		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(unit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
+		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
 			return err
 		}
 		if result.SessionID != "" {
 			sessionID = result.SessionID
 		}
-		appendEvent(runPath, events.Event{Kind: "round", At: time.Now(), PR: slug, Commit: unit.Title,
+		appendEvent(runPath, events.Event{Kind: "round", At: time.Now(), PR: slug, Commit: commit.Title,
 			Round: round, Seconds: int(time.Since(roundStarted).Seconds()), SessionID: result.SessionID})
-		fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", unit.Title, result.Outcome, logPath)
+		fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", commit.Title, result.Outcome, logPath)
 		if result.Outcome == claude.RateLimited {
 			usageJSON, _ := claude.Usage(ctx)
 			current, _ := usage.Read(usageJSON)
@@ -195,7 +195,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 			if afterWork != "" {
 				fmt.Fprintf(stdout, "  stop: rate limited, %s\n", afterWork)
 				record.Result, record.Reason = "stopped", "rate limited, "+afterWork
-				return state.SaveCommit(statePath, slug, unit.Title, record)
+				return state.SaveCommit(statePath, slug, commit.Title, record)
 			}
 			fmt.Fprintf(stdout, "  sleep until %s\n", reset.Local().Format("15:04"))
 			sleepUntil(ctx, reset)
@@ -210,12 +210,12 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 			return err
 		}
 		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
-		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: unit.Title, Result: color(checked.Green)})
+		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: commit.Title, Result: color(checked.Green)})
 		failure := checked.Tail
 		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
 		if checked.Green {
-			verdict, err := classifyBranch(stdout, worktreeDir, base, meta, unit)
+			verdict, err := classifyBranch(stdout, worktreeDir, base, meta, commit)
 			if err != nil {
 				return err
 			}
@@ -226,13 +226,13 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 					record.Result = "read-code"
 				}
 			}
-			appendEvent(runPath, events.Event{Kind: "verdict", At: time.Now(), PR: slug, Commit: unit.Title, Result: record.Result, Reason: verdict.Reason})
+			appendEvent(runPath, events.Event{Kind: "verdict", At: time.Now(), PR: slug, Commit: commit.Title, Result: record.Result, Reason: verdict.Reason})
 			if !verdict.Red {
-				return state.SaveCommit(statePath, slug, unit.Title, record)
+				return state.SaveCommit(statePath, slug, commit.Title, record)
 			}
 			failure = verdict.Reason
 		}
-		if err := state.SaveCommit(statePath, slug, unit.Title, record); err != nil {
+		if err := state.SaveCommit(statePath, slug, commit.Title, record); err != nil {
 			return err
 		}
 		sameFailureAsLastRound := round > 1 && failure == failureTail
@@ -242,9 +242,9 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 		failureTail = failure
 	}
 	fmt.Fprintln(stdout, "  blocked")
-	appendEvent(runPath, events.Event{Kind: "blocked", At: time.Now(), PR: slug, Commit: unit.Title})
+	appendEvent(runPath, events.Event{Kind: "blocked", At: time.Now(), PR: slug, Commit: commit.Title})
 	record.Result = "blocked"
-	return state.SaveCommit(statePath, slug, unit.Title, record)
+	return state.SaveCommit(statePath, slug, commit.Title, record)
 }
 
 // usageStopReason says why no unit should open at now under loaded's limits, or "" when one may.
@@ -296,7 +296,7 @@ func color(green bool) string {
 
 // classifyBranch prints the files and the count of lines worktreeDir's branch changed, then the verdict on them.
 // It returns that verdict, or an error when git fails.
-func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, unit plan.Commit) (check.Verdict, error) {
+func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, commit plan.Commit) (check.Verdict, error) {
 	changes, err := git.ChangedFiles(worktreeDir, base)
 	if err != nil {
 		return check.Verdict{}, err
@@ -309,7 +309,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 		return check.Verdict{}, err
 	}
 	fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
-	verdict := check.Classify(changes, addedLines, check.WherePaths(unit.Body), meta.Protected, meta.Dependencies)
+	verdict := check.Classify(changes, addedLines, check.WherePaths(commit.Body), meta.Protected, meta.Dependencies)
 	if verdict.Red {
 		fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
 	} else if verdict.ReadCode {
@@ -320,16 +320,16 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 	return verdict, nil
 }
 
-// openPR pushes planPR's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
+// openPR pushes planPR's branch from worktreeDir once commitTitle has ended green or read-code in the state file at statePath,
 // then opens a PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
 // isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack, and a pr_open line goes into the run file at runPath.
 // It returns an error when git, gh or the state file fails.
-func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, unitTitle string, hasPR, isEnglishWanted bool) error {
+func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
 	}
-	result := saved.PRs[planPR.Slug].Commits[unitTitle].Result
+	result := saved.PRs[planPR.Slug].Commits[commitTitle].Result
 	isAccepted := result == "green" || result == "read-code"
 	if !isAccepted {
 		return nil
@@ -346,7 +346,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if err != nil {
 		return err
 	}
-	input := bodyInput(planPR, saved.PRs[planPR.Slug], unitTitle)
+	input := bodyInput(planPR, saved.PRs[planPR.Slug], commitTitle)
 	input.Risks = pr.RiskLines(changes, addedLines)
 	diff, err := git.Diff(worktreeDir, base)
 	if err != nil {
@@ -372,7 +372,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 		return err
 	}
 	fmt.Fprintf(stdout, "  PR: %s\n", prURL)
-	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: unitTitle, URL: prURL})
+	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: commitTitle, URL: prURL})
 	if previousURL != "" {
 		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
 			return err
@@ -382,15 +382,15 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 }
 
 // bodyInput collects the PR description's values: planPR's summary, every unit of planPR that ended green or read-code
-// in savedPR, in plan order, and the last check tail of lastUnitTitle.
-func bodyInput(planPR plan.PR, savedPR state.PR, lastUnitTitle string) pr.BodyInput {
-	input := pr.BodyInput{Summary: planPR.Summary, CheckTail: savedPR.Commits[lastUnitTitle].CheckTail}
-	for _, unit := range planPR.Commits {
-		record := savedPR.Commits[unit.Title]
+// in savedPR, in plan order, and the last check tail of lastCommitTitle.
+func bodyInput(planPR plan.PR, savedPR state.PR, lastCommitTitle string) pr.BodyInput {
+	input := pr.BodyInput{Summary: planPR.Summary, CheckTail: savedPR.Commits[lastCommitTitle].CheckTail}
+	for _, commit := range planPR.Commits {
+		record := savedPR.Commits[commit.Title]
 		if record.Result != "green" && record.Result != "read-code" {
 			continue
 		}
-		bodyUnit := pr.BodyUnit{What: plan.LabelValue(unit.Body, "WHAT"), Done: plan.LabelValue(unit.Body, "DONE")}
+		bodyUnit := pr.BodyUnit{What: plan.LabelValue(commit.Body, "WHAT"), Done: plan.LabelValue(commit.Body, "DONE")}
 		if record.Result == "read-code" {
 			bodyUnit.ReadCodeReason = record.Reason
 		}
@@ -405,8 +405,8 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	if err != nil {
 		return err
 	}
-	for _, unit := range planPR.Commits {
-		result := saved.PRs[planPR.Slug].Commits[unit.Title].Result
+	for _, commit := range planPR.Commits {
+		result := saved.PRs[planPR.Slug].Commits[commit.Title].Result
 		if result != "green" && result != "read-code" {
 			return nil
 		}
@@ -467,8 +467,8 @@ func prSummary(statePath string, planPR plan.PR) (notify.PR, error) {
 		Total: len(planPR.Commits),
 		URL:   savedPR.PRURL,
 	}
-	for _, unit := range planPR.Commits {
-		result := savedPR.Commits[unit.Title].Result
+	for _, commit := range planPR.Commits {
+		result := savedPR.Commits[commit.Title].Result
 		if result == "green" || result == "read-code" {
 			prResult.Done++
 		} else if result != "" && prResult.Failure == "" {
@@ -482,9 +482,9 @@ func prSummary(statePath string, planPR plan.PR) (notify.PR, error) {
 // so a stop from an earlier night is not reported again; it returns "" when there is none or the file cannot be read.
 func stopReason(statePath string, planPR plan.PR, started time.Time) string {
 	saved, _ := state.Load(statePath)
-	for _, unit := range saved.PRs[planPR.Slug].Commits {
-		if unit.Result == "stopped" && unit.UpdatedAt.After(started) {
-			return unit.Reason
+	for _, commit := range saved.PRs[planPR.Slug].Commits {
+		if commit.Result == "stopped" && commit.UpdatedAt.After(started) {
+			return commit.Reason
 		}
 	}
 	return ""
