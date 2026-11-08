@@ -12,8 +12,7 @@ import (
 	"testing"
 )
 
-// setUpRepoWithOneCommitPlan makes a temp folder holding a git repo with a bare origin, a one-commit plan and a nightcap.yml
-// pointing at both, swaps in a fake gh with no PR, moves into it, and returns the repo path.
+// setUpRepoWithOneCommitPlan moves into a temp folder with a git repo, a one-commit plan and a fake gh, and returns the repo path.
 func setUpRepoWithOneCommitPlan(t *testing.T) string {
 	t.Helper()
 	t.Chdir(t.TempDir())
@@ -78,9 +77,8 @@ func useFakeClaude(t *testing.T) {
 // fakeGhPath is resolved before any test moves into its temp folder.
 var fakeGhPath, _ = filepath.Abs("testdata/fake-gh.sh")
 
-// useFakeGh points NIGHTCAP_GH at testdata/fake-gh.sh, which answers `gh pr view <branch>` with that branch's state
-// from prStates (OPEN, MERGED or CLOSED), or "no PR" for a branch not in it, and prints one PR URL for anything else.
-// It returns the path of the file where the fake writes every call's arguments, one call per line.
+// useFakeGh swaps in a fake gh that answers `gh pr view <branch>` from prStates and prints one PR URL for anything else.
+// It returns the file where the fake writes each call's arguments, one call per line.
 func useFakeGh(t *testing.T, prStates map[string]string) string {
 	t.Helper()
 	var stateLines []string
