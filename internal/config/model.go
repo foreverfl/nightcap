@@ -5,8 +5,8 @@ type Config struct {
 	MaxTurns       int      `yaml:"max_turns"`
 	MaxRounds      int      `yaml:"max_rounds"`
 	WorkStart      string   `yaml:"work_start"`       // "HH:MM" local time
-	LimitSession   int      `yaml:"limit_session"`    // 5h window % above which no new unit starts; 0 means no cap
-	LimitWeeklyAll int      `yaml:"limit_weekly_all"` // weekly all-models % above which no new unit starts; 0 means no cap
+	LimitSession   int      `yaml:"limit_session"`    // 5h window % above which no new commit starts; 0 means no cap
+	LimitWeeklyAll int      `yaml:"limit_weekly_all"` // weekly all-models % above which no new commit starts; 0 means no cap
 	AllowedTools   []string `yaml:"allowed_tools"`    // claude --allowedTools; read, edit, and only local commands
 	Webhook        string   `yaml:"webhook"`          // Discord or Slack webhook URL for the end-of-night message; empty sends nothing
 	Lang           []string `yaml:"lang"`             // PR body languages, e.g. [ko] or [en, ko]

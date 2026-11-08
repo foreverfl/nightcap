@@ -12,18 +12,18 @@ import (
 type Summary struct {
 	Repos      []string
 	Start, End time.Time
-	Usage      []UsageLine // empty when no unit ran or /usage could not be read
-	PRs        []PR        // one per plan heading the night worked on, in plan order
+	Usage      []UsageLine // empty when no commit ran or /usage could not be read
+	PRs        []PR        // one per plan PR the night worked on, in plan order
 	StopReason string      // why the run stopped early, such as "session 85% ≥ 80"; empty when it ran to the end
 }
 
-// PR is one plan heading, which is one PR, at the end of the night.
+// PR is one PR of the plan at the end of the night.
 type PR struct {
 	Mark        plan.Mark
 	Title       string // as the plan writes it, such as "feat: 검색 (search)"
-	Done, Total int    // units ended green out of the heading's units
+	Done, Total int    // commits ended green out of the PR's commits
 	URL         string // the PR link; empty when no PR was opened
-	Failure     string // the first unit's result word when nothing ended green: red, blocked or stopped
+	Failure     string // the first commit's result word when nothing ended green: red, blocked or stopped
 }
 
 // UsageLine is one /usage limit at the start and the end of the night.
@@ -52,7 +52,7 @@ func Message(summary Summary) string {
 }
 
 // prLine draws one PR as "<result> <mark> <title> · n/m · <state> · <link>".
-// The message goes out before GitHub merges anything, so a finished 🤖 heading reads "auto-merge", never "merged".
+// The message goes out before GitHub merges anything, so a finished 🤖 PR reads "auto-merge", never "merged".
 func prLine(pr PR) string {
 	result, state, link := "✅", "open", pr.URL
 	switch {

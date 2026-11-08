@@ -62,7 +62,7 @@ func TestClassifyFileOutsideWhereIsReadCode(t *testing.T) {
 func TestClassifyFileInsideWhereIsGreen(t *testing.T) {
 	verdict := Classify([]git.Change{{Status: "M", Path: "internal/feed/feed.go"}}, nil, []string{"internal/feed/feed.go"}, protected, dependencies)
 	if verdict != (Result{}) {
-		t.Fatalf("a file inside WHERE should give an empty Verdict, got %+v", verdict)
+		t.Fatalf("a file inside WHERE should give an empty Result, got %+v", verdict)
 	}
 }
 

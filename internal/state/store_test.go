@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// oneState returns a State with one heading holding one unit that ended green.
+// oneState returns a State with one PR holding one commit that ended green.
 func oneState() State {
 	return State{PRs: map[string]PR{
 		"feed": {
@@ -38,6 +38,6 @@ func TestLoadWithoutFileIsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(loaded.PRs) != 0 {
-		t.Fatalf("a missing file should give no sections, got %+v", loaded.PRs)
+		t.Fatalf("a missing file should give no PRs, got %+v", loaded.PRs)
 	}
 }
