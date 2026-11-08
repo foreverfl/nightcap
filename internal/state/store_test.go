@@ -8,9 +8,9 @@ import (
 
 // oneState returns a State with one heading holding one unit that ended green.
 func oneState() State {
-	return State{Sections: map[string]Section{
+	return State{PRs: map[string]PR{
 		"feed": {
-			Units: map[string]Unit{
+			Commits: map[string]Commit{
 				"add-it": {Attempts: 1, Result: "green", UpdatedAt: time.Date(2026, 11, 3, 2, 0, 0, 0, time.UTC)},
 			},
 		},
@@ -26,8 +26,8 @@ func TestSaveThenLoadGivesTheSameUnit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := oneState().Sections["feed"].Units["add-it"]
-	if got := loaded.Sections["feed"].Units["add-it"]; got != want {
+	want := oneState().PRs["feed"].Commits["add-it"]
+	if got := loaded.PRs["feed"].Commits["add-it"]; got != want {
 		t.Fatalf("want %+v, got %+v", want, got)
 	}
 }
@@ -37,7 +37,7 @@ func TestLoadWithoutFileIsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(loaded.Sections) != 0 {
-		t.Fatalf("a missing file should give no sections, got %+v", loaded.Sections)
+	if len(loaded.PRs) != 0 {
+		t.Fatalf("a missing file should give no sections, got %+v", loaded.PRs)
 	}
 }

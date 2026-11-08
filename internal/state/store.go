@@ -12,7 +12,7 @@ import (
 // Load reads the state file at path, or returns an empty State when the file does not exist yet.
 // It returns an error when the file cannot be read or is not valid JSON.
 func Load(path string) (State, error) {
-	loaded := State{Sections: map[string]Section{}}
+	loaded := State{PRs: map[string]PR{}}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return loaded, nil
@@ -51,26 +51,26 @@ func Save(path string, current State) error {
 	return os.Rename(tempFile.Name(), path)
 }
 
-// SaveUnit records how one unit of the heading sectionSlug ended, stamped with the current time,
+// SaveCommit records how one unit of the heading sectionSlug ended, stamped with the current time,
 // keeping everything else already in the state file at path. It returns an error when reading or writing fails.
-func SaveUnit(path, sectionSlug, unitTitle string, unit Unit) error {
+func SaveCommit(path, sectionSlug, unitTitle string, unit Commit) error {
 	current, err := Load(path)
 	if err != nil {
 		return err
 	}
-	section := current.Sections[sectionSlug]
-	if section.Units == nil {
-		section.Units = map[string]Unit{}
+	section := current.PRs[sectionSlug]
+	if section.Commits == nil {
+		section.Commits = map[string]Commit{}
 	}
 	unit.UpdatedAt = time.Now().UTC()
-	section.Units[unitTitle] = unit
-	current.Sections[sectionSlug] = section
+	section.Commits[unitTitle] = unit
+	current.PRs[sectionSlug] = section
 	return Save(path, current)
 }
 
 // IsBlocked reports whether any unit of section ended blocked.
-func IsBlocked(section Section) bool {
-	for _, unit := range section.Units {
+func IsBlocked(section PR) bool {
+	for _, unit := range section.Commits {
 		if unit.Result == "blocked" {
 			return true
 		}
@@ -85,8 +85,8 @@ func SavePRStatus(path, sectionSlug, prURL, prState string) error {
 	if err != nil {
 		return err
 	}
-	section := current.Sections[sectionSlug]
+	section := current.PRs[sectionSlug]
 	section.PRURL, section.PRState = prURL, prState
-	current.Sections[sectionSlug] = section
+	current.PRs[sectionSlug] = section
 	return Save(path, current)
 }

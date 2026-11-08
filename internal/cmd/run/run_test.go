@@ -92,7 +92,7 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	saved, _ := state.Load(statePath)
-	got := saved.Sections["feed"].Units["add it"]
+	got := saved.PRs["feed"].Commits["add it"]
 	reset := time.Date(2099, 1, 1, 4, 30, 0, 0, time.FixedZone("JST", 9*60*60))
 	if got.Attempts != 2 || got.Result != "green" || !sleptUntil.Equal(reset) {
 		t.Fatalf("got %+v, slept until %v; want 2 rounds, green, slept until %v", got, sleptUntil, reset)
@@ -113,7 +113,7 @@ func TestBuildPromptLeavesTheRulesOutOfAResumedSession(t *testing.T) {
 
 func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
-	if err := state.SaveUnit(statePath, "feed-hurl", "list feeds", state.Unit{Result: "green"}); err != nil {
+	if err := state.SaveCommit(statePath, "feed-hurl", "list feeds", state.Commit{Result: "green"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.SavePRStatus(statePath, "feed-hurl", "https://github.com/foreverfl/blog-v2/pull/41", "OPEN"); err != nil {
@@ -142,7 +142,7 @@ func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
 		{started.Add(time.Hour), "session 85% ≥ 80"},
 		{started.Add(-24 * time.Hour), ""},
 	} {
-		saved := state.State{Sections: map[string]state.Section{"feed-hurl": {Units: map[string]state.Unit{
+		saved := state.State{PRs: map[string]state.PR{"feed-hurl": {Commits: map[string]state.Commit{
 			"list feeds": {Result: "stopped", Reason: "session 85% ≥ 80", UpdatedAt: tc.updatedAt},
 		}}}}
 		if err := state.Save(statePath, saved); err != nil {

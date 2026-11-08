@@ -87,7 +87,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		stackOnto[section.Slug] = previousOpenURL
 		previousOpenBranch = ""
 		previousOpenURL = ""
-		if state.IsBlocked(saved.Sections[section.Slug]) {
+		if state.IsBlocked(saved.PRs[section.Slug]) {
 			fmt.Fprintf(stdout, "stop %s: blocked, the headings below wait\n", section.Title)
 			break // plans are written top to bottom, so a heading below stands on this one
 		}
@@ -144,7 +144,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		}
 		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
 			fmt.Fprintf(stdout, "  stop: %s\n", reason)
-			return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
+			return state.SaveCommit(statePath, section.Slug, unit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
 		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath, runPath); err != nil {
 			return err
@@ -168,7 +168,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Commit, statePath, runPath string) error {
 	failureTail := ""
 	sessionID := ""
-	record := state.Unit{}
+	record := state.Commit{}
 	appendEvent(runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: unit.Title})
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
@@ -195,7 +195,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 			if afterWork != "" {
 				fmt.Fprintf(stdout, "  stop: rate limited, %s\n", afterWork)
 				record.Result, record.Reason = "stopped", "rate limited, "+afterWork
-				return state.SaveUnit(statePath, slug, unit.Title, record)
+				return state.SaveCommit(statePath, slug, unit.Title, record)
 			}
 			fmt.Fprintf(stdout, "  sleep until %s\n", reset.Local().Format("15:04"))
 			sleepUntil(ctx, reset)
@@ -228,11 +228,11 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 			}
 			appendEvent(runPath, events.Event{Kind: "verdict", At: time.Now(), PR: slug, Commit: unit.Title, Result: record.Result, Reason: verdict.Reason})
 			if !verdict.Red {
-				return state.SaveUnit(statePath, slug, unit.Title, record)
+				return state.SaveCommit(statePath, slug, unit.Title, record)
 			}
 			failure = verdict.Reason
 		}
-		if err := state.SaveUnit(statePath, slug, unit.Title, record); err != nil {
+		if err := state.SaveCommit(statePath, slug, unit.Title, record); err != nil {
 			return err
 		}
 		sameFailureAsLastRound := round > 1 && failure == failureTail
@@ -244,7 +244,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 	fmt.Fprintln(stdout, "  blocked")
 	appendEvent(runPath, events.Event{Kind: "blocked", At: time.Now(), PR: slug, Commit: unit.Title})
 	record.Result = "blocked"
-	return state.SaveUnit(statePath, slug, unit.Title, record)
+	return state.SaveCommit(statePath, slug, unit.Title, record)
 }
 
 // usageStopReason says why no unit should open at now under loaded's limits, or "" when one may.
@@ -329,7 +329,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if err != nil {
 		return err
 	}
-	result := saved.Sections[section.Slug].Units[unitTitle].Result
+	result := saved.PRs[section.Slug].Commits[unitTitle].Result
 	isAccepted := result == "green" || result == "read-code"
 	if !isAccepted {
 		return nil
@@ -346,7 +346,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if err != nil {
 		return err
 	}
-	input := bodyInput(section, saved.Sections[section.Slug], unitTitle)
+	input := bodyInput(section, saved.PRs[section.Slug], unitTitle)
 	input.Risks = pr.RiskLines(changes, addedLines)
 	diff, err := git.Diff(worktreeDir, base)
 	if err != nil {
@@ -383,10 +383,10 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 
 // bodyInput collects the PR description's values: section's summary, every unit of section that ended green or read-code
 // in sectionState, in plan order, and the last check tail of lastUnitTitle.
-func bodyInput(section plan.PR, sectionState state.Section, lastUnitTitle string) pr.BodyInput {
-	input := pr.BodyInput{Summary: section.Summary, CheckTail: sectionState.Units[lastUnitTitle].CheckTail}
+func bodyInput(section plan.PR, sectionState state.PR, lastUnitTitle string) pr.BodyInput {
+	input := pr.BodyInput{Summary: section.Summary, CheckTail: sectionState.Commits[lastUnitTitle].CheckTail}
 	for _, unit := range section.Commits {
-		record := sectionState.Units[unit.Title]
+		record := sectionState.Commits[unit.Title]
 		if record.Result != "green" && record.Result != "read-code" {
 			continue
 		}
@@ -406,7 +406,7 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 		return err
 	}
 	for _, unit := range section.Commits {
-		result := saved.Sections[section.Slug].Units[unit.Title].Result
+		result := saved.PRs[section.Slug].Commits[unit.Title].Result
 		if result != "green" && result != "read-code" {
 			return nil
 		}
@@ -460,7 +460,7 @@ func prSummary(statePath string, section plan.PR) (notify.PR, error) {
 	if err != nil {
 		return notify.PR{}, err
 	}
-	sectionState := saved.Sections[section.Slug]
+	sectionState := saved.PRs[section.Slug]
 	prResult := notify.PR{
 		Mark:  section.Mark,
 		Title: fmt.Sprintf("%s: %s (%s)", section.Type, section.Title, section.Slug),
@@ -468,7 +468,7 @@ func prSummary(statePath string, section plan.PR) (notify.PR, error) {
 		URL:   sectionState.PRURL,
 	}
 	for _, unit := range section.Commits {
-		result := sectionState.Units[unit.Title].Result
+		result := sectionState.Commits[unit.Title].Result
 		if result == "green" || result == "read-code" {
 			prResult.Done++
 		} else if result != "" && prResult.Failure == "" {
@@ -482,7 +482,7 @@ func prSummary(statePath string, section plan.PR) (notify.PR, error) {
 // so a stop from an earlier night is not reported again; it returns "" when there is none or the file cannot be read.
 func stopReason(statePath string, section plan.PR, started time.Time) string {
 	saved, _ := state.Load(statePath)
-	for _, unit := range saved.Sections[section.Slug].Units {
+	for _, unit := range saved.PRs[section.Slug].Commits {
 		if unit.Result == "stopped" && unit.UpdatedAt.After(started) {
 			return unit.Reason
 		}
