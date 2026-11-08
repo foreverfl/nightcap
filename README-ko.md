@@ -1,5 +1,7 @@
 # nightcap
 
+[English](README.md) | 한국어 | [日本語](README-ja.md)
+
 계획 문서의 PR 하나를 집어 밤사이 Claude Code로 커밋을 하나씩 구현하고, 아침에 사람이 합칠 PR을 연다.
 
 ## 설치
