@@ -19,7 +19,7 @@ var testNames = []string{"hurl", "go test", "make check", "cargo test", "npm tes
 func Parse(text string) []PR {
 	var planPRs []PR
 	var current *Commit
-	underTypedHeading := false
+	underTypedPR := false
 	inFence := false
 
 	flush := func() {
@@ -57,13 +57,13 @@ func Parse(text string) []PR {
 		}
 		if strings.HasPrefix(line, "#") {
 			planPR, ok := parsePRLine(line)
-			underTypedHeading = ok
+			underTypedPR = ok
 			if ok {
 				planPRs = append(planPRs, planPR)
 			}
 			continue
 		}
-		if !underTypedHeading {
+		if !underTypedPR {
 			continue
 		}
 		if title, ok := strings.CutPrefix(line, "- [ ] "); ok {

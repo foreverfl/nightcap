@@ -31,7 +31,7 @@ func TestParseReadsSummary(t *testing.T) {
 	}
 }
 
-func TestParseReadsUnitBody(t *testing.T) {
+func TestParseReadsCommitBody(t *testing.T) {
 	commit := Parse(onePR())[0].Commits[0]
 	want := "- [ ] add the list endpoint\n  - WHAT  return posts\n  - DONE  go test ./internal/feed passes"
 	if commit.Title != "add the list endpoint" || commit.Body != want {
@@ -39,7 +39,7 @@ func TestParseReadsUnitBody(t *testing.T) {
 	}
 }
 
-func TestParseSkipsDoneUnits(t *testing.T) {
+func TestParseSkipsDoneCommits(t *testing.T) {
 	text := strings.Replace(onePR(), "- [ ]", "- [x]", 1)
 	if commits := Parse(text)[0].Commits; len(commits) != 0 {
 		t.Fatalf("got %d commits, want 0", len(commits))
@@ -53,7 +53,7 @@ func TestParseIgnoresCheckboxInsideFence(t *testing.T) {
 	}
 }
 
-func TestParseMarksUnitWithoutCheckName(t *testing.T) {
+func TestParseMarksCommitWithoutTestName(t *testing.T) {
 	text := strings.Replace(onePR(), "go test ./internal/feed passes", "read it by hand", 1)
 	if Parse(text)[0].Commits[0].HasTest {
 		t.Fatal("HasTest = true, want false")
@@ -122,7 +122,7 @@ func TestParseReadsEachReadingMark(t *testing.T) {
 func TestPickSkipsAPRWithoutAMark(t *testing.T) {
 	planPRs := Parse(strings.Replace(onePR(), "📄 ", "", 1))
 	if len(planPRs) != 1 || planPRs[0].Mark != MarkNone {
-		t.Fatalf("an unmarked heading should still parse with MarkNone, got %+v", planPRs)
+		t.Fatalf("an unmarked PR should still parse with MarkNone, got %+v", planPRs)
 	}
 	if _, ok := Pick(planPRs); ok {
 		t.Fatal("Pick should not take an unmarked PR")

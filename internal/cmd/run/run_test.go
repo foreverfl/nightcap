@@ -49,7 +49,7 @@ func TestUsageStopReason(t *testing.T) {
 	}
 }
 
-func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
+func TestRunCommitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 	repo := t.TempDir()
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main", repo},
@@ -111,7 +111,7 @@ func TestBuildPromptLeavesTheRulesOutOfAResumedSession(t *testing.T) {
 	}
 }
 
-func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
+func TestPRSummaryCountsGreenCommitsAndTakesThePRLink(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	if err := state.SaveCommit(statePath, "feed-hurl", "list feeds", state.Commit{Result: "green"}); err != nil {
 		t.Fatal(err)

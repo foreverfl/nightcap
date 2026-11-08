@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestBuildBodyListsUnitsAndTheReadCodeReason(t *testing.T) {
+func TestBuildBodyListsCommitsAndTheReadCodeReason(t *testing.T) {
 	body, err := BuildBody(BodyInput{
 		Summary: "피드를 보여 준다",
 		Commits: []BodyCommit{
@@ -77,7 +77,7 @@ func TestBuildBilingualBodyWithoutTranslationSaysEnglishIsMissing(t *testing.T) 
 	}
 }
 
-func TestBuildBodyPutsTheReviewOrderInPlaceOfTheUnitList(t *testing.T) {
+func TestBuildBodyPutsTheReviewOrderInPlaceOfTheCommitList(t *testing.T) {
 	body, err := BuildBody(BodyInput{
 		Commits:     []BodyCommit{{What: "피드 목록", Done: "go test 통과"}},
 		ReviewOrder: "흐름 1. 실행할 때: 피드를 읽는다",

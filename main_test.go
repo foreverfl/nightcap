@@ -98,7 +98,7 @@ func useFakeGh(t *testing.T, prStates map[string]string) string {
 	return callsPath
 }
 
-func TestDispatchRunPrintsPickedSection(t *testing.T) {
+func TestDispatchRunPrintsPickedPR(t *testing.T) {
 	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	var stdout, stderr bytes.Buffer
@@ -127,7 +127,7 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 	}
 }
 
-func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
+func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
@@ -180,7 +180,7 @@ func TestRunLogsEachRoundAndTestToTheRunFile(t *testing.T) {
 	}
 }
 
-func TestRunMarksUnitBlockedWhenTheSameFailureRepeats(t *testing.T) {
+func TestRunMarksCommitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "false", "max_rounds: 3\n")
@@ -205,7 +205,7 @@ func TestDispatchUnknownCommandPrintsUsageAndExits2(t *testing.T) {
 	}
 }
 
-func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
+func TestRunMarksCommitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	repo := setUpRepoWithOneCommitPlan(t)
 	fakeClaude := filepath.Join(t.TempDir(), "claude")
 	script := strings.Join([]string{
@@ -237,7 +237,7 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	}
 }
 
-func TestRunStopsAtAHeadingThatEndedBlocked(t *testing.T) {
+func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
 	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	writePlanAndConfig(t, repo, "false", "max_rounds: 2\n")
@@ -273,7 +273,7 @@ func TestRunStopsAtAHeadingThatEndedBlocked(t *testing.T) {
 	}
 }
 
-func TestRunSkipsAHeadingWhosePRWasMerged(t *testing.T) {
+func TestRunSkipsAPRThatWasMerged(t *testing.T) {
 	setUpRepoWithOneCommitPlan(t)
 	useFakeGh(t, map[string]string{"feat/feed": "MERGED"})
 	var stdout, stderr bytes.Buffer
@@ -331,7 +331,7 @@ func TestRunWithoutProtectedInTheFrontmatterFails(t *testing.T) {
 	}
 }
 
-func TestRunStartsOnThePreviousHeadingsOpenPRBranch(t *testing.T) {
+func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 	repo := setUpRepoWithOneCommitPlan(t)
 	useFakeClaude(t)
 	planText := []byte(strings.Join([]string{
@@ -391,14 +391,14 @@ func runLint(t *testing.T, plan string) (int, string) {
 	return code, stdout.String()
 }
 
-func TestLintPlanWithoutTypedHeadingExits1(t *testing.T) {
+func TestLintPlanWithoutTypedPRExits1(t *testing.T) {
 	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## 📄 feat: a (b)", "## cmd", 1))
 	if code != 1 || stdout != "no PR with type: slug\n" {
 		t.Fatalf("want exit 1 and the no-PR line, got %d %q", code, stdout)
 	}
 }
 
-func TestLintUnitWithoutCheckExits1(t *testing.T) {
+func TestLintCommitWithoutTestExits1(t *testing.T) {
 	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "go test ./... passes", "테스트가 없음", 1))
 	want := "PR: feat: a (b)\n  no test: read the docs\n"
 	if code != 1 || stdout != want {
@@ -406,14 +406,14 @@ func TestLintUnitWithoutCheckExits1(t *testing.T) {
 	}
 }
 
-func TestLintPrintsAPersonHeadingAsPerson(t *testing.T) {
+func TestLintPrintsAPersonPRAsPerson(t *testing.T) {
 	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## 📄 feat:", "## 👤 feat:", 1))
 	if code != 0 || stdout != "person: feat: a (b)\n" {
 		t.Fatalf("want exit 0 and %q, got %d %q", "person: feat: a (b)\n", code, stdout)
 	}
 }
 
-func TestLintHeadingWithoutAMarkExits1(t *testing.T) {
+func TestLintPRWithoutAMarkExits1(t *testing.T) {
 	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "📄 ", "", 1))
 	if code != 1 || stdout != "no mark: feat: a (b)\n" {
 		t.Fatalf("want exit 1 and %q, got %d %q", "no mark: feat: a (b)\n", code, stdout)

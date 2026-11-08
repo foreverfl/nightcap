@@ -17,7 +17,7 @@ func oneState() State {
 	}}
 }
 
-func TestSaveThenLoadGivesTheSameUnit(t *testing.T) {
+func TestSaveThenLoadGivesTheSameCommit(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".nightcap", "state.json")
 	if err := Save(path, oneState()); err != nil {
 		t.Fatal(err)
