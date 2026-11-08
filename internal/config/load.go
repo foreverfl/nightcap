@@ -17,9 +17,8 @@ var defaultAllowedTools = []string{
 	"Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)",
 }
 
-// Load reads <dir>/nightcap.yml, fills missing keys with defaults
-// (max_turns 30, max_rounds 3, lang [ko], merge_method merge; an empty work_start turns the before-work limit off).
-// It returns an error when the file is unreadable or malformed.
+// Load reads <dir>/nightcap.yml and fills missing keys with defaults: max_turns 30, max_rounds 3, lang [ko], merge_method merge.
+// An empty work_start turns the before-work limit off.
 func Load(dir string) (Config, error) {
 	raw, err := os.ReadFile(filepath.Join(dir, FileName))
 	if err != nil {

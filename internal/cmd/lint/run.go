@@ -11,9 +11,8 @@ import (
 	"nightcap/internal/verdict"
 )
 
-// Run is the "lint" subcommand; args[0] is the plan file. It prints every PR a night run can read, each 👤 PR as person, each PR without a reading mark as no mark,
-// every open commit whose DONE names no test, and every WHERE path the run cannot read inside the repo,
-// and returns an error when any of those is found or the file cannot be read.
+// Run prints what in the plan file args[0] a night run cannot use: 👤 PRs, PRs without a mark, commits without a test and unreadable WHERE paths.
+// It fails when it finds any of those or cannot read the file.
 func Run(args []string, stdout io.Writer) error {
 	if len(args) == 0 {
 		return errors.New("lint: name a plan file")

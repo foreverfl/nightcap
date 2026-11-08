@@ -22,7 +22,6 @@ type Event struct {
 }
 
 // Append adds event to the file at path as one JSON line, creating the file and its folder when missing.
-// It returns an error when the folder, the file or the write fails.
 func Append(path string, event Event) error {
 	line, err := json.Marshal(event)
 	if err != nil {

@@ -10,7 +10,6 @@ import (
 )
 
 // Load reads the state file at path, or returns an empty State when the file does not exist yet.
-// It returns an error when the file cannot be read or is not valid JSON.
 func Load(path string) (State, error) {
 	loaded := State{PRs: map[string]PR{}}
 	data, err := os.ReadFile(path)
@@ -27,7 +26,6 @@ func Load(path string) (State, error) {
 }
 
 // Save writes current to path through a temp file and a rename, so a crash never leaves half a file.
-// It returns an error when the folder, the temp file or the rename fails.
 func Save(path string, current State) error {
 	data, err := json.MarshalIndent(current, "", "  ")
 	if err != nil {
@@ -51,8 +49,7 @@ func Save(path string, current State) error {
 	return os.Rename(tempFile.Name(), path)
 }
 
-// SaveCommit records how one commit of the PR prSlug ended, stamped with the current time,
-// keeping everything else already in the state file at path. It returns an error when reading or writing fails.
+// SaveCommit records how commitTitle of the PR prSlug ended, stamped with the current time, keeping the rest of the state file.
 func SaveCommit(path, prSlug, commitTitle string, commit Commit) error {
 	current, err := Load(path)
 	if err != nil {
@@ -78,8 +75,7 @@ func IsBlocked(pr PR) bool {
 	return false
 }
 
-// SavePRStatus notes the PR URL and state gh reported for the PR prSlug, keeping the rest of the state file at path.
-// It returns an error when reading or writing fails.
+// SavePRStatus notes the PR URL and state gh reported for the PR prSlug, keeping the rest of the state file.
 func SavePRStatus(path, prSlug, prURL, prState string) error {
 	current, err := Load(path)
 	if err != nil {

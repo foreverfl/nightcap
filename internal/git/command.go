@@ -6,8 +6,7 @@ import (
 	"strings"
 )
 
-// runGit runs git -C repo with args and returns its stdout,
-// or an error that carries git's combined output when it exits non-zero.
+// runGit runs git -C repo with args and returns its stdout; on a non-zero exit the error carries git's output.
 func runGit(repo string, args ...string) (string, error) {
 	command := exec.Command("git", append([]string{"-C", repo}, args...)...)
 	output, err := command.CombinedOutput()

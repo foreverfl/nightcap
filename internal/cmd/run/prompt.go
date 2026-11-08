@@ -8,9 +8,8 @@ import (
 //go:embed prompts/commit.md
 var commitRules string
 
-// BuildPrompt joins the session marker, the commit rules, the commit's plan text and,
-// from the second round on, the tail of the previous failing test.
-// A resumed session already has the marker and the rules, and on a retry the commit too, so those are left out.
+// BuildPrompt returns one round's prompt: the commit rules and commitBody, then failureTail from the second round on.
+// When isResumed it leaves out what the session already has: the rules, and on a retry commitBody too.
 func BuildPrompt(commitBody, failureTail string, isResumed bool) string {
 	var parts []string
 	if !isResumed {

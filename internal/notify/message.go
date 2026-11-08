@@ -32,8 +32,7 @@ type UsageLine struct {
 	Start, End int
 }
 
-// Message builds the end-of-night message: the repos and times, one indented line per usage limit,
-// then after a blank line one line per PR, and after another blank line why the run stopped, when it stopped early.
+// Message builds the morning message: the header and usage lines, one line per PR, then why the run stopped early.
 func Message(summary Summary) string {
 	lines := []string{fmt.Sprintf("🌙 nightcap %s · %s → %s", strings.Join(summary.Repos, ", "), summary.Start.Format("15:04"), summary.End.Format("15:04"))}
 	for _, limit := range summary.Usage {
@@ -51,8 +50,7 @@ func Message(summary Summary) string {
 	return strings.Join(lines, "\n")
 }
 
-// prLine draws one PR as "<result> <mark> <title> · n/m · <state> · <link>".
-// The message goes out before GitHub merges anything, so a finished 🤖 PR reads "auto-merge", never "merged".
+// prLine draws one PR as "<result> <mark> <title> · n/m · <state> · <link>"; a finished 🤖 PR reads "auto-merge", as nothing has merged yet.
 func prLine(pr PR) string {
 	result, state, link := "✅", "open", pr.URL
 	switch {

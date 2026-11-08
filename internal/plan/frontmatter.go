@@ -9,8 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ParseMeta reads the frontmatter between a leading "---" line and the next "---" line of a plan file.
-// A file that does not start with "---" has an empty Meta. It returns an error when the closing "---" is missing or the yaml is malformed.
+// ParseMeta returns the frontmatter between the plan's leading "---" line and the next one; a file without one has an empty Meta.
+// It fails when the closing "---" is missing or the yaml is malformed.
 func ParseMeta(text string) (Meta, error) {
 	var meta Meta
 	rest, hasFrontmatter := strings.CutPrefix(text, "---\n")

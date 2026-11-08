@@ -6,9 +6,8 @@ import (
 	"strings"
 )
 
-// AddWorktree checks out branch in <repo>/.nightcap/worktrees/<slug> and returns that folder.
-// A new branch starts from base; an existing folder is reused as is and an existing branch is checked out as it is.
-// It returns an error when git fails.
+// AddWorktree checks branch out in <repo>/.nightcap/worktrees/<slug> and returns that folder.
+// A new branch starts from base; an existing folder or branch is reused as it is.
 func AddWorktree(repo, base, branch, slug string) (string, error) {
 	worktreeDir := filepath.Join(repo, ".nightcap", "worktrees", slug)
 	if _, err := os.Stat(worktreeDir); err == nil {
@@ -25,7 +24,6 @@ func AddWorktree(repo, base, branch, slug string) (string, error) {
 }
 
 // ListWorktrees returns one line per worktree of repo, as `git worktree list` prints them.
-// It returns an error when git fails.
 func ListWorktrees(repo string) ([]string, error) {
 	output, err := runGit(repo, "worktree", "list")
 	if err != nil {

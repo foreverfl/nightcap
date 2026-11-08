@@ -17,8 +17,7 @@ func ReadingLabel(mark plan.Mark) string {
 	return readPRLabel
 }
 
-// AddLabel creates label in the repo when it is missing and puts it on the PR whose head is branch.
-// It returns an error when gh fails.
+// AddLabel puts label on the PR whose head is branch, creating the label in the repo when it is missing.
 func AddLabel(worktreeDir, branch, label string) error {
 	if _, err := runGh(worktreeDir, "label", "create", label, "--force"); err != nil {
 		return err

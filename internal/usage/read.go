@@ -19,8 +19,7 @@ type Usage struct {
 	Known     bool
 }
 
-// Read takes `claude -p /usage --output-format stream-json --verbose` output, finds the line with usage_report,
-// and returns its session and weekly_all limits; weekly_scoped is skipped because night runs never use that model.
+// Read returns the session and weekly_all limits from the usage_report line of `claude -p /usage` stream-json output.
 func Read(output []byte) (Usage, error) {
 	for line := range bytes.SplitSeq(output, []byte("\n")) {
 		if len(bytes.TrimSpace(line)) == 0 {

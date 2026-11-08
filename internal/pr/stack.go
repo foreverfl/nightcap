@@ -5,7 +5,7 @@ func stackArgs(previousURL, newURL string) []string {
 	return []string{"stack", "link", previousURL, newURL}
 }
 
-// LinkStack ties the PR at newURL onto the PR at previousURL as a GitHub stacked PR. It returns an error when gh fails.
+// LinkStack ties the PR at newURL onto the PR at previousURL as a GitHub stacked PR.
 func LinkStack(worktreeDir, previousURL, newURL string) error {
 	_, err := runGh(worktreeDir, stackArgs(previousURL, newURL)...)
 	return err

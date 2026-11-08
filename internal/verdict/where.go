@@ -2,8 +2,7 @@ package verdict
 
 import "strings"
 
-// WherePaths returns the paths on a commit body's "- WHERE" line, split on "," "·" "|" outside braces,
-// with "dir/{a.go, b.go}" expanded and parenthesized notes and backticks dropped.
+// WherePaths returns the paths on a commit body's "- WHERE" line, with "dir/{a.go, b.go}" expanded and notes in parentheses dropped.
 // It returns nil when the body has no WHERE line.
 func WherePaths(body string) []string {
 	for line := range strings.SplitSeq(body, "\n") {
