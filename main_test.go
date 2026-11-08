@@ -23,9 +23,9 @@ func TestDispatchRunPrintsPickedPR(t *testing.T) {
 	want := strings.Join([]string{
 		"commit-bot.md",
 		"  branch: feat/feed",
-		"  worktree: " + filepath.Join(testsetup.CacheDir(t, repo), "worktrees/feed"),
+		"  worktree: " + filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees/feed"),
 		"  take  add it",
-		"  ran  add it: done (log: " + filepath.Join(testsetup.DataDir(t, repo), "logs/feed/commit1-round1.log") + ")",
+		"  ran  add it: done (log: " + filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round1.log") + ")",
 		"  test: green",
 		"  added lines: 0",
 		"  verdict: green",
@@ -49,7 +49,7 @@ func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.DataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("max_rounds 2 should leave 2 round logs, got %d: %v", len(logs), logs)
 	}
@@ -80,7 +80,7 @@ func TestRunMarksCommitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.DataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("`false` fails the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -126,7 +126,7 @@ func TestRunMarksCommitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.DataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("go.sum turns the verdict red the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -272,8 +272,8 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
 	}
-	first, _ := os.ReadFile(filepath.Join(testsetup.DataDir(t, repo), "logs/feed/commit1-round1.log"))
-	second, _ := os.ReadFile(filepath.Join(testsetup.DataDir(t, repo), "logs/feed/commit1-round2.log"))
+	first, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round1.log"))
+	second, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round2.log"))
 	if strings.Contains(string(first), "--resume") || !strings.Contains(string(second), "--resume s1") {
 		t.Fatalf("round 1 should start a session and round 2 resume s1\nround 1: %s\nround 2: %s", first, second)
 	}
