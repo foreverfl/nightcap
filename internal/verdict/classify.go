@@ -47,9 +47,8 @@ var skipCallsAtLineStart = []string{
 // A newly added file whose path contains this word is treated as a database migration.
 const migrationPathWord = "migration"
 
-// Classify returns a red Result when a change touches one of dependencies, modifies or deletes an existing
-// file matching protected (adding a new one is allowed), or an added line carries a skip marker; past those, a ReadCode
-// one when a change adds a migration or sits outside wherePaths. Otherwise an empty Result.
+// Classify returns a red Result when a change touches a dependency file, edits or deletes a protected file, or adds a skip marker,
+// a ReadCode one when it adds a migration or sits outside wherePaths, and an empty Result otherwise.
 func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, protected, dependencies []string) Result {
 	for _, change := range changes {
 		if matchesAny(change.Path, dependencies) {
@@ -75,8 +74,7 @@ func Classify(changes []git.Change, addedLines []git.AddedLine, wherePaths, prot
 	return Result{}
 }
 
-// isInsideWhere reports whether filePath is one of wherePaths, sits under one of them as a folder,
-// or has the same file name as an entry that names no folder.
+// isInsideWhere reports whether filePath is a WHERE path, sits under one as a folder, or shares a file name with one that names no folder.
 func isInsideWhere(filePath string, wherePaths []string) bool {
 	for _, where := range wherePaths {
 		folder := strings.TrimSuffix(where, "/")
@@ -88,8 +86,7 @@ func isInsideWhere(filePath string, wherePaths []string) bool {
 	return false
 }
 
-// matchesAny reports whether filePath matches one of patterns.
-// A pattern without "/" is matched against the file name; "dir/*" matches any file under a dir folder.
+// matchesAny reports whether filePath matches one of patterns; a pattern without "/" matches the file name, "dir/*" anything under dir.
 func matchesAny(filePath string, patterns []string) bool {
 	for _, pattern := range patterns {
 		folder, _, hasFolder := strings.Cut(pattern, "/")

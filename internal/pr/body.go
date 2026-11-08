@@ -38,8 +38,7 @@ func (input BodyInput) HasNoRisk() bool {
 	return !input.IsMissingEnglish && !input.IsMissingReviewOrder && !hasReadCode && len(input.Risks) == 0
 }
 
-// BuildBody fills prompts/pr.md with input and returns the Korean half of the PR description.
-// It returns an error only when the template cannot be filled.
+// BuildBody fills prompts/pr.md with input and returns the Korean PR body.
 func BuildBody(input BodyInput) (string, error) {
 	var body strings.Builder
 	if err := bodyTemplate.Execute(&body, input); err != nil {
@@ -48,9 +47,8 @@ func BuildBody(input BodyInput) (string, error) {
 	return body.String(), nil
 }
 
-// BuildBilingualBody returns the English description translated from the Korean one, a "---", then the Korean one.
-// When translate fails it returns the Korean one alone with "no English block" first in the risk section;
-// it returns an error only when the template cannot be filled.
+// BuildBilingualBody returns the English body translated from the Korean one, a "---", then the Korean one.
+// When translate fails it returns the Korean one alone, with "no English block" first in its risks.
 func BuildBilingualBody(input BodyInput, translate func(korean string) (string, error)) (string, error) {
 	korean, err := BuildBody(input)
 	if err != nil {

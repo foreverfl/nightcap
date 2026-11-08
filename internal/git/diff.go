@@ -8,8 +8,7 @@ type Change struct {
 	Path   string
 }
 
-// ChangedFiles lists the files worktreeDir's branch changed since it left base, a rename coming back as a D and an A.
-// It returns an empty list when nothing changed, or an error when git fails.
+// ChangedFiles lists the files the branch changed since it left base; a rename comes back as a D and an A.
 func ChangedFiles(worktreeDir, base string) ([]Change, error) {
 	output, err := runGit(worktreeDir, "diff", "--name-status", "--no-renames", base+"...HEAD")
 	if err != nil {
@@ -32,8 +31,7 @@ type AddedLine struct {
 	Text string
 }
 
-// AddedLines returns every line worktreeDir's branch added since it left base, each with the file it is in.
-// It returns an empty list when nothing was added, or an error when git fails.
+// AddedLines returns every line the branch added since it left base, each with the file it is in.
 func AddedLines(worktreeDir, base string) ([]AddedLine, error) {
 	output, err := runGit(worktreeDir, "diff", "--unified=0", base+"...HEAD")
 	if err != nil {
@@ -53,7 +51,7 @@ func AddedLines(worktreeDir, base string) ([]AddedLine, error) {
 	return lines, nil
 }
 
-// Diff returns the whole diff of worktreeDir's branch since it left base. It returns an error when git fails.
+// Diff returns the branch's whole diff since it left base.
 func Diff(worktreeDir, base string) (string, error) {
 	return runGit(worktreeDir, "diff", base+"...HEAD")
 }

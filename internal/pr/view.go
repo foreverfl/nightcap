@@ -14,8 +14,8 @@ type View struct {
 	URL   string `json:"url"`
 }
 
-// ViewBranch asks gh, from repoDir, for the PR whose head is branch. It returns an empty View when the branch has no PR,
-// or an error when gh fails for any other reason or prints something that is not the JSON it was asked for.
+// ViewBranch returns the PR whose head is branch, or an empty View when the branch has no PR.
+// It fails when gh fails for another reason or prints something that is not the JSON asked for.
 func ViewBranch(repoDir, branch string) (View, error) {
 	command := exec.Command(ghBinary(), "pr", "view", branch, "--json", "state,url")
 	command.Dir = repoDir
