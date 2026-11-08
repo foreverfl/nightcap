@@ -10,7 +10,10 @@ import (
 	"nightcap/internal/cmd/status"
 )
 
-const usage = "usage: nightcap run <plan> | nightcap status <plan> | nightcap lint <plan>\n"
+// version is the release tag, set at link time with -ldflags "-X main.version=v0.1.0".
+var version = "dev"
+
+const usage = "usage: nightcap run <plan> | nightcap status <plan> | nightcap lint <plan> | nightcap version\n"
 
 func main() {
 	os.Exit(dispatch(os.Args[1:], os.Stdout, os.Stderr))
@@ -31,6 +34,8 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		err = status.Run(args[1:], stdout)
 	case "lint":
 		err = lint.Run(args[1:], stdout)
+	case "version":
+		fmt.Fprintln(stdout, "nightcap", version)
 	default:
 		fmt.Fprint(stderr, usage)
 		return 2

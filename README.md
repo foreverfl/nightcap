@@ -1,32 +1,72 @@
 # nightcap
 
+English | [한국어](README-ko.md) | [日本語](README-ja.md)
+
 Runs Claude Code overnight against one PR of a plan file, one commit at a time, and opens a PR that a person merges in the morning.
 
-- Contract files are create-only: the agent may add a test, a hurl or a spec, never edit or delete one.
-- Dependencies are yours: a change to go.mod, Cargo.toml or package.json is a red run, not a PR.
-- The PR's mark picks the label: `🤖` auto-merges (`nightcap:auto`), `📄` read the PR (`nightcap:read-pr`), `👤` a person does it. What nightcap notices at night goes into the risk list, not the label.
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/foreverfl/nightcap/main/install.sh | sh
+```
+
+It puts the latest release in `~/.local/bin/nightcap` and adds that folder to PATH in `~/.zshrc` or `~/.bashrc` when it is missing. `curl … | NIGHTCAP_VERSION=v0.1.0 sh` installs one release instead. With Go, `go install .` in a clone works too.
+
+## Usage
+
+Run it from the folder that holds `nightcap.yml` (see Setup):
+
+```sh
+nightcap run ~/work/todolist/blog-v2/commit-bot.md     # runs the next commit of the top PR that has one
+nightcap status ~/work/todolist/blog-v2/commit-bot.md  # prints the plan's repo and its worktrees
+nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # prints what a night run cannot use
+nightcap version
+```
 
 ## Setup
 
-Plan files follow [docs/plan-format.md](docs/plan-format.md); copy [examples/plan.md](examples/plan.md) to start.
+### Plan file
 
-Put this at the top of your plan file. All four keys are required; write `[]` for a list you want empty:
+A plan file looks like this; copy [examples/plan.md](examples/plan.md) to start, and see [docs/plan-format.md](docs/plan-format.md) for the rules. All four frontmatter keys are required; write `[]` for a list you want empty:
 
-```yaml
+```text
 ---
-repo: ~/workspace/apps-web/blog-v2
-test: make check                                         # the test every commit must pass
-protected: ["*.tsp", "*.hurl", "*_test.go", "Makefile"]  # contract files the agent may add but not edit or delete
-dependencies: [go.mod, go.sum]                           # dependency files the agent may not touch
+repo: ~/workspace/apps-web/notes
+test: make check                                 # the test every commit must pass
+protected: ["*.hurl", "*_test.go", "Makefile"]   # contract files the agent may add but not edit or delete
+dependencies: [go.mod, go.sum]                   # dependency files the agent may not touch
 ---
+
+# notes app — commits
+
+## 📄 feat: list and add notes (notes-api)
+
+Notes can be listed and added over HTTP, so the web page has something to call.
+
+- [ ] list notes
+  - WHAT  return every note as JSON, newest first
+  - WHERE internal/note/handler.go, internal/note/store.go
+  - DONE  hurl hurl/notes/GET.hurl green
+
+- [ ] add a note
+  - WHAT  save a note from a JSON body and answer 201
+  - WHERE internal/note/handler.go, internal/note/store.go
+  - DONE  go test ./internal/note passes
 ```
+
+### nightcap.yml
 
 Copy [examples/nightcap.yml](examples/nightcap.yml) next to the binary as `nightcap.yml` (it is gitignored). It holds the settings every plan shares on this machine.
 
-Then run it from that folder with the plan file:
-
-```sh
-nightcap run ~/work/todolist/blog-v2/commit-bot.md
+```yaml
+work_start: "09:00"        # leave empty for no before-work limit; when set, no new usage window opens within 5h of it
+limit_session: 80          # no new commit starts while the 5h window is above this %
+limit_weekly_all: 80       # no new commit starts while the weekly % is above this; ignored within 24h of its reset
+max_turns: 30
+max_rounds: 3
+webhook: https://discord.com/api/webhooks/…   # Discord or Slack (hooks.slack.com); one message when the night ends, empty for none
+lang: [en, ko]             # PR body languages, default [ko]
+merge_method: rebase       # how a 🤖 PR auto-merges: rebase, otherwise merge. default merge
 ```
 
 Before the first 🤖 PR, turn auto-merge on in the repo once. With `merge_method: rebase`, allow rebase merges too:
