@@ -1,4 +1,4 @@
-package check
+package verdict
 
 import "strings"
 

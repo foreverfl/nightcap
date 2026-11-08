@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"nightcap/internal/check"
 	"nightcap/internal/client/claude"
 	"nightcap/internal/config"
 	"nightcap/internal/events"
@@ -23,6 +22,7 @@ import (
 	"nightcap/internal/state"
 	"nightcap/internal/test"
 	"nightcap/internal/usage"
+	"nightcap/internal/verdict"
 )
 
 // Run is the "run" subcommand; args is everything after "run", and its first item is the plan file.
@@ -297,28 +297,28 @@ func color(green bool) string {
 
 // classifyBranch prints the files and the count of lines worktreeDir's branch changed, then the verdict on them.
 // It returns that verdict, or an error when git fails.
-func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, commit plan.Commit) (check.Verdict, error) {
+func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, commit plan.Commit) (verdict.Result, error) {
 	changes, err := git.ChangedFiles(worktreeDir, base)
 	if err != nil {
-		return check.Verdict{}, err
+		return verdict.Result{}, err
 	}
 	for _, change := range changes {
 		fmt.Fprintf(stdout, "  %s %s\n", change.Status, change.Path)
 	}
 	addedLines, err := git.AddedLines(worktreeDir, base)
 	if err != nil {
-		return check.Verdict{}, err
+		return verdict.Result{}, err
 	}
 	fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
-	verdict := check.Classify(changes, addedLines, check.WherePaths(commit.Body), meta.Protected, meta.Dependencies)
-	if verdict.Red {
-		fmt.Fprintf(stdout, "  verdict: red (%s)\n", verdict.Reason)
-	} else if verdict.ReadCode {
-		fmt.Fprintf(stdout, "  verdict: green, read the code (%s)\n", verdict.Reason)
+	result := verdict.Classify(changes, addedLines, verdict.WherePaths(commit.Body), meta.Protected, meta.Dependencies)
+	if result.Red {
+		fmt.Fprintf(stdout, "  verdict: red (%s)\n", result.Reason)
+	} else if result.ReadCode {
+		fmt.Fprintf(stdout, "  verdict: green, read the code (%s)\n", result.Reason)
 	} else {
 		fmt.Fprintln(stdout, "  verdict: green")
 	}
-	return verdict, nil
+	return result, nil
 }
 
 // openPR pushes planPR's branch from worktreeDir once commitTitle has ended green or read-code in the state file at statePath,

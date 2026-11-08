@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"nightcap/internal/check"
 	"nightcap/internal/plan"
+	"nightcap/internal/verdict"
 )
 
 // Run is the "lint" subcommand; args[0] is the plan file. It prints every heading a night run can read, each 👤 heading as person, each heading without a reading mark as no mark,
@@ -44,7 +44,7 @@ func Run(args []string, stdout io.Writer) error {
 				fmt.Fprintf(stdout, "  no check: %s\n", commit.Title)
 				hasProblem = true
 			}
-			for _, path := range check.WherePaths(commit.Body) {
+			for _, path := range verdict.WherePaths(commit.Body) {
 				if canNeverMatchAChangedFile(path) {
 					fmt.Fprintf(stdout, "  WHERE path not readable: %s\n", path)
 					hasProblem = true
