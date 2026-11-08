@@ -14,8 +14,6 @@ It puts the latest release in `~/.local/bin/nightcap` and adds that folder to PA
 
 ## Usage
 
-Run it from the folder that holds `nightcap.yml` (see Setup):
-
 ```sh
 nightcap run ~/work/todolist/blog-v2/commit-bot.md     # runs the next commit of the top PR that has one
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # prints the plan's repo and its worktrees
@@ -56,7 +54,9 @@ Notes can be listed and added over HTTP, so the web page has something to call.
 
 ### nightcap.yml
 
-Copy [examples/nightcap.yml](examples/nightcap.yml) next to the binary as `nightcap.yml` (it is gitignored). It holds the settings every plan shares on this machine.
+Copy [examples/nightcap.yml](examples/nightcap.yml) to `~/.config/nightcap/nightcap.yml`. It holds the settings every plan shares on this machine.
+
+nightcap writes nothing into your repo but the branch: state and logs go under `~/.local/share/nightcap/<repo>`, worktrees under `~/.cache/nightcap/<repo>`. `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` move them when set.
 
 ```yaml
 work_start: "09:00"        # leave empty for no before-work limit; when set, no new usage window opens within 5h of it
