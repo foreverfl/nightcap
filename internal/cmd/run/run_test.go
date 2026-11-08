@@ -119,9 +119,9 @@ func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 	if err := state.SavePRStatus(statePath, "feed-hurl", "https://github.com/foreverfl/blog-v2/pull/41", "OPEN"); err != nil {
 		t.Fatal(err)
 	}
-	section := plan.PR{Mark: plan.MarkAuto, Type: "test", Title: "피드 hurl 파일", Slug: "feed-hurl",
+	planPR := plan.PR{Mark: plan.MarkAuto, Type: "test", Title: "피드 hurl 파일", Slug: "feed-hurl",
 		Commits: []plan.Commit{{Title: "list feeds"}, {Title: "add a feed"}, {Title: "delete a feed"}}}
-	got, err := prSummary(statePath, section)
+	got, err := prSummary(statePath, planPR)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	started := time.Date(2026, 11, 8, 23, 0, 0, 0, time.UTC)
-	section := plan.PR{Slug: "feed-hurl", Commits: []plan.Commit{{Title: "list feeds"}}}
+	planPR := plan.PR{Slug: "feed-hurl", Commits: []plan.Commit{{Title: "list feeds"}}}
 	for _, tc := range []struct {
 		updatedAt time.Time
 		want      string
@@ -148,7 +148,7 @@ func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
 		if err := state.Save(statePath, saved); err != nil {
 			t.Fatal(err)
 		}
-		if got := stopReason(statePath, section, started); got != tc.want {
+		if got := stopReason(statePath, planPR, started); got != tc.want {
 			t.Fatalf("stopped at %v: got %q, want %q", tc.updatedAt, got, tc.want)
 		}
 	}

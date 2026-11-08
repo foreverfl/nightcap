@@ -22,24 +22,24 @@ func Run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	sections := plan.Parse(string(planText))
-	if len(sections) == 0 {
+	planPRs := plan.Parse(string(planText))
+	if len(planPRs) == 0 {
 		fmt.Fprintln(stdout, "no heading with type: slug")
 		return errors.New("lint: the plan has problems")
 	}
 	hasProblem := false
-	for _, section := range sections {
-		if section.IsPerson() {
-			fmt.Fprintf(stdout, "person: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
+	for _, planPR := range planPRs {
+		if planPR.IsPerson() {
+			fmt.Fprintf(stdout, "person: %s: %s (%s)\n", planPR.Type, planPR.Title, planPR.Slug)
 			continue
 		}
-		if section.Mark == plan.MarkNone {
-			fmt.Fprintf(stdout, "no mark: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
+		if planPR.Mark == plan.MarkNone {
+			fmt.Fprintf(stdout, "no mark: %s: %s (%s)\n", planPR.Type, planPR.Title, planPR.Slug)
 			hasProblem = true
 			continue
 		}
-		fmt.Fprintf(stdout, "heading: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
-		for _, unit := range section.Commits {
+		fmt.Fprintf(stdout, "heading: %s: %s (%s)\n", planPR.Type, planPR.Title, planPR.Slug)
+		for _, unit := range planPR.Commits {
 			if !unit.HasCheck {
 				fmt.Fprintf(stdout, "  no check: %s\n", unit.Title)
 				hasProblem = true

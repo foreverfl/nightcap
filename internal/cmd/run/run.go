@@ -54,17 +54,17 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
 	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
-	var pickedSection *plan.PR // the heading tonight took; nil when there was none
+	var pickedPR *plan.PR // the heading tonight took; nil when there was none
 	// one file per run, under its start date: .nightcap/runs/261108/225500.jsonl
 	runPath := filepath.Join(meta.Repo, ".nightcap", "runs", started.Format("060102"), started.Format("150405")+".jsonl")
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
-		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedSection, started, startUsage)
+		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPR, started, startUsage)
 		reason := ""
 		if runErr != nil {
 			reason = runErr.Error()
-		} else if pickedSection != nil {
-			reason = stopReason(statePath, *pickedSection, started)
+		} else if pickedPR != nil {
+			reason = stopReason(statePath, *pickedPR, started)
 		}
 		appendEvent(runPath, events.Event{Kind: "run_end", At: time.Now(), Reason: reason})
 	}()
@@ -79,52 +79,52 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	previousOpenBranch := ""
 	stackOnto := map[string]string{}
 	previousOpenURL := ""
-	for _, section := range plan.Parse(string(planText)) {
-		baseFor[section.Slug] = "main"
+	for _, planPR := range plan.Parse(string(planText)) {
+		baseFor[planPR.Slug] = "main"
 		if previousOpenBranch != "" {
-			baseFor[section.Slug] = previousOpenBranch
+			baseFor[planPR.Slug] = previousOpenBranch
 		}
-		stackOnto[section.Slug] = previousOpenURL
+		stackOnto[planPR.Slug] = previousOpenURL
 		previousOpenBranch = ""
 		previousOpenURL = ""
-		if state.IsBlocked(saved.PRs[section.Slug]) {
-			fmt.Fprintf(stdout, "stop %s: blocked, the headings below wait\n", section.Title)
+		if state.IsBlocked(saved.PRs[planPR.Slug]) {
+			fmt.Fprintf(stdout, "stop %s: blocked, the headings below wait\n", planPR.Title)
 			break // plans are written top to bottom, so a heading below stands on this one
 		}
-		if len(section.Commits) > 0 {
-			view, err := pr.ViewBranch(meta.Repo, section.Type+"/"+section.Slug)
+		if len(planPR.Commits) > 0 {
+			view, err := pr.ViewBranch(meta.Repo, planPR.Type+"/"+planPR.Slug)
 			if err != nil {
 				return err
 			}
-			if err := state.SavePRStatus(statePath, section.Slug, view.URL, view.State); err != nil {
+			if err := state.SavePRStatus(statePath, planPR.Slug, view.URL, view.State); err != nil {
 				return err
 			}
 			if view.State == "MERGED" || view.State == "CLOSED" {
-				fmt.Fprintf(stdout, "skip %s: PR %s\n", section.Title, strings.ToLower(view.State))
+				fmt.Fprintf(stdout, "skip %s: PR %s\n", planPR.Title, strings.ToLower(view.State))
 				continue
 			}
-			hasPR[section.Slug] = view.State == "OPEN"
-			if hasPR[section.Slug] {
-				previousOpenBranch = section.Type + "/" + section.Slug
+			hasPR[planPR.Slug] = view.State == "OPEN"
+			if hasPR[planPR.Slug] {
+				previousOpenBranch = planPR.Type + "/" + planPR.Slug
 				previousOpenURL = view.URL
 			}
 		}
-		notBlocked = append(notBlocked, section)
+		notBlocked = append(notBlocked, planPR)
 	}
-	section, ok := plan.Pick(notBlocked)
+	planPR, ok := plan.Pick(notBlocked)
 	if !ok {
 		fmt.Fprintf(stdout, "%s: nothing to take\n", planPath)
 		return nil
 	}
-	pickedSection = &section
-	base := baseFor[section.Slug]
-	branch := section.Type + "/" + section.Slug
-	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, section.Slug)
+	pickedPR = &planPR
+	base := baseFor[planPR.Slug]
+	branch := planPR.Type + "/" + planPR.Slug
+	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, planPR.Slug)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", planPath, branch, worktreeDir)
-	for _, unit := range section.Commits {
+	for _, unit := range planPR.Commits {
 		mark := "skip"
 		if unit.HasCheck {
 			mark = "take"
@@ -132,7 +132,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		fmt.Fprintf(stdout, "  %s  %s\n", mark, unit.Title)
 	}
 
-	for index, unit := range section.Commits {
+	for index, unit := range planPR.Commits {
 		if !unit.HasCheck {
 			continue
 		}
@@ -144,15 +144,15 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		}
 		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
 			fmt.Fprintf(stdout, "  stop: %s\n", reason)
-			return state.SaveCommit(statePath, section.Slug, unit.Title, state.Commit{Result: "stopped", Reason: reason})
+			return state.SaveCommit(statePath, planPR.Slug, unit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
-		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath, runPath); err != nil {
+		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, unit, statePath, runPath); err != nil {
 			return err
 		}
-		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
+		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, unit.Title, hasPR[planPR.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
 			return err
 		}
-		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, section); err != nil {
+		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, planPR); err != nil {
 			return err
 		}
 		break
@@ -320,21 +320,21 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 	return verdict, nil
 }
 
-// openPR pushes section's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
+// openPR pushes planPR's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
 // then opens a PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
 // isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack, and a pr_open line goes into the run file at runPath.
 // It returns an error when git, gh or the state file fails.
-func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, section plan.PR, unitTitle string, hasPR, isEnglishWanted bool) error {
+func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, unitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
 	}
-	result := saved.PRs[section.Slug].Commits[unitTitle].Result
+	result := saved.PRs[planPR.Slug].Commits[unitTitle].Result
 	isAccepted := result == "green" || result == "read-code"
 	if !isAccepted {
 		return nil
 	}
-	branch := section.Type + "/" + section.Slug
+	branch := planPR.Type + "/" + planPR.Slug
 	if err := git.Push(worktreeDir, branch); err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if err != nil {
 		return err
 	}
-	input := bodyInput(section, saved.PRs[section.Slug], unitTitle)
+	input := bodyInput(planPR, saved.PRs[planPR.Slug], unitTitle)
 	input.Risks = pr.RiskLines(changes, addedLines)
 	diff, err := git.Diff(worktreeDir, base)
 	if err != nil {
@@ -367,26 +367,26 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if hasPR {
 		return pr.EditBody(worktreeDir, branch, body)
 	}
-	prURL, err := pr.Create(worktreeDir, base, section.Type+": "+section.Title, body)
+	prURL, err := pr.Create(worktreeDir, base, planPR.Type+": "+planPR.Title, body)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "  PR: %s\n", prURL)
-	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: section.Slug, Commit: unitTitle, URL: prURL})
+	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: unitTitle, URL: prURL})
 	if previousURL != "" {
 		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
 			return err
 		}
 	}
-	return state.SavePRStatus(statePath, section.Slug, prURL, "OPEN")
+	return state.SavePRStatus(statePath, planPR.Slug, prURL, "OPEN")
 }
 
-// bodyInput collects the PR description's values: section's summary, every unit of section that ended green or read-code
-// in sectionState, in plan order, and the last check tail of lastUnitTitle.
-func bodyInput(section plan.PR, sectionState state.PR, lastUnitTitle string) pr.BodyInput {
-	input := pr.BodyInput{Summary: section.Summary, CheckTail: sectionState.Commits[lastUnitTitle].CheckTail}
-	for _, unit := range section.Commits {
-		record := sectionState.Commits[unit.Title]
+// bodyInput collects the PR description's values: planPR's summary, every unit of planPR that ended green or read-code
+// in savedPR, in plan order, and the last check tail of lastUnitTitle.
+func bodyInput(planPR plan.PR, savedPR state.PR, lastUnitTitle string) pr.BodyInput {
+	input := pr.BodyInput{Summary: planPR.Summary, CheckTail: savedPR.Commits[lastUnitTitle].CheckTail}
+	for _, unit := range planPR.Commits {
+		record := savedPR.Commits[unit.Title]
 		if record.Result != "green" && record.Result != "read-code" {
 			continue
 		}
@@ -400,24 +400,24 @@ func bodyInput(section plan.PR, sectionState state.PR, lastUnitTitle string) pr.
 }
 
 // labelWhenFinished adds, once every unit is done, the label the heading's mark names, and turns on auto-merge for 🤖.
-func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, section plan.PR) error {
+func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, planPR plan.PR) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
 	}
-	for _, unit := range section.Commits {
-		result := saved.PRs[section.Slug].Commits[unit.Title].Result
+	for _, unit := range planPR.Commits {
+		result := saved.PRs[planPR.Slug].Commits[unit.Title].Result
 		if result != "green" && result != "read-code" {
 			return nil
 		}
 	}
-	branch := section.Type + "/" + section.Slug
-	label := pr.ReadingLabel(section.Mark)
+	branch := planPR.Type + "/" + planPR.Slug
+	label := pr.ReadingLabel(planPR.Mark)
 	if err := pr.AddLabel(worktreeDir, branch, label); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "  label: %s\n", label)
-	if section.Mark == plan.MarkAuto {
+	if planPR.Mark == plan.MarkAuto {
 		if err := pr.EnableAutoMerge(worktreeDir, branch, mergeMethod); err != nil {
 			return err
 		}
@@ -428,16 +428,16 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 
 // sendNightSummary sends the morning message: the repo, the times, when a unit ran the usage, and the picked heading's line
 // read from the state file at statePath. A failed send or an unreadable state file only prints to stderr.
-func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedSection *plan.PR, started time.Time, startUsage usage.Usage) {
+func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedPR *plan.PR, started time.Time, startUsage usage.Usage) {
 	summary := notify.Summary{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
-	if pickedSection != nil {
-		prResult, err := prSummary(statePath, *pickedSection)
+	if pickedPR != nil {
+		prResult, err := prSummary(statePath, *pickedPR)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "notify:", err)
 		} else {
 			summary.PRs = []notify.PR{prResult}
 		}
-		summary.StopReason = stopReason(statePath, *pickedSection, started)
+		summary.StopReason = stopReason(statePath, *pickedPR, started)
 	}
 	if startUsage.Known {
 		usageJSON, _ := claude.Usage(ctx)
@@ -453,22 +453,22 @@ func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath
 	}
 }
 
-// prSummary reads how section's units ended in the state file at statePath: green and read-code count as done,
+// prSummary reads how planPR's units ended in the state file at statePath: green and read-code count as done,
 // and the first other result is the failure word. It returns an error when the state file cannot be read.
-func prSummary(statePath string, section plan.PR) (notify.PR, error) {
+func prSummary(statePath string, planPR plan.PR) (notify.PR, error) {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return notify.PR{}, err
 	}
-	sectionState := saved.PRs[section.Slug]
+	savedPR := saved.PRs[planPR.Slug]
 	prResult := notify.PR{
-		Mark:  section.Mark,
-		Title: fmt.Sprintf("%s: %s (%s)", section.Type, section.Title, section.Slug),
-		Total: len(section.Commits),
-		URL:   sectionState.PRURL,
+		Mark:  planPR.Mark,
+		Title: fmt.Sprintf("%s: %s (%s)", planPR.Type, planPR.Title, planPR.Slug),
+		Total: len(planPR.Commits),
+		URL:   savedPR.PRURL,
 	}
-	for _, unit := range section.Commits {
-		result := sectionState.Commits[unit.Title].Result
+	for _, unit := range planPR.Commits {
+		result := savedPR.Commits[unit.Title].Result
 		if result == "green" || result == "read-code" {
 			prResult.Done++
 		} else if result != "" && prResult.Failure == "" {
@@ -478,11 +478,11 @@ func prSummary(statePath string, section plan.PR) (notify.PR, error) {
 	return prResult, nil
 }
 
-// stopReason returns the reason of a unit of section that the state file at statePath saved as stopped after started,
+// stopReason returns the reason of a unit of planPR that the state file at statePath saved as stopped after started,
 // so a stop from an earlier night is not reported again; it returns "" when there is none or the file cannot be read.
-func stopReason(statePath string, section plan.PR, started time.Time) string {
+func stopReason(statePath string, planPR plan.PR, started time.Time) string {
 	saved, _ := state.Load(statePath)
-	for _, unit := range saved.PRs[section.Slug].Commits {
+	for _, unit := range saved.PRs[planPR.Slug].Commits {
 		if unit.Result == "stopped" && unit.UpdatedAt.After(started) {
 			return unit.Reason
 		}
