@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"maps"
 	"os"
 	"os/exec"
@@ -136,6 +137,36 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 	}
 	if !strings.HasSuffix(stdout.String(), "  check: red\n  blocked\n") {
 		t.Fatalf("stdout should end with a red check and blocked, got %q", stdout.String())
+	}
+}
+
+func TestRunLogsEachRoundAndTestToTheRunFile(t *testing.T) {
+	repo := setUpRepoWithOneUnitPlan(t)
+	useFakeClaude(t)
+	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	runFiles, _ := filepath.Glob(filepath.Join(repo, ".nightcap/runs/*/*.jsonl"))
+	if len(runFiles) != 1 {
+		t.Fatalf("one run should leave one run file, got %v", runFiles)
+	}
+	text, err := os.ReadFile(runFiles[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	for line := range strings.SplitSeq(strings.TrimSpace(string(text)), "\n") {
+		var event struct{ Kind string }
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatal(err)
+		}
+		kinds = append(kinds, event.Kind)
+	}
+	want := []string{"run_start", "commit_start", "round", "test", "round", "test", "run_end"}
+	if !slices.Equal(kinds, want) {
+		t.Fatalf("kinds = %v, want %v", kinds, want)
 	}
 }
 

@@ -146,7 +146,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 			fmt.Fprintf(stdout, "  stop: %s\n", reason)
 			return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
 		}
-		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
+		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath, runPath); err != nil {
 			return err
 		}
 		if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
@@ -162,15 +162,18 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 
 // runUnit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail or a red verdict's
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
-// or claude stops before Done. Every round's outcome goes into the state file at statePath.
+// or claude stops before Done. Every round's outcome goes into the state file at statePath,
+// and commit_start, each round and each test go as lines into the run file at runPath.
 // It returns an error only when claude, sh, git or the state file fails.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Unit, statePath string) error {
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Unit, statePath, runPath string) error {
 	failureTail := ""
 	sessionID := ""
 	record := state.Unit{}
+	appendEvent(runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: unit.Title})
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
 		logPath := filepath.Join(meta.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
+		roundStarted := time.Now()
 		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(unit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
 			return err
@@ -178,6 +181,8 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 		if result.SessionID != "" {
 			sessionID = result.SessionID
 		}
+		appendEvent(runPath, events.Event{Kind: "round", At: time.Now(), PR: slug, Commit: unit.Title,
+			Round: round, Seconds: int(time.Since(roundStarted).Seconds()), SessionID: result.SessionID})
 		fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", unit.Title, result.Outcome, logPath)
 		if result.Outcome == claude.RateLimited {
 			usageJSON, _ := claude.Usage(ctx)
@@ -205,6 +210,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 			return err
 		}
 		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
+		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: unit.Title, Result: color(checked.Green)})
 		failure := checked.Tail
 		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
