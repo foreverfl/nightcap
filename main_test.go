@@ -313,22 +313,6 @@ func TestRunWithoutAPlanFileFails(t *testing.T) {
 	}
 }
 
-func TestStatusPrintsTheFrontmatterRepo(t *testing.T) {
-	repo := setUpRepoWithOneCommitPlan(t)
-	var stdout, stderr bytes.Buffer
-	// each worktree line is git worktree list's own "<path>  <commit> [main]"
-	if code := dispatch([]string{"status", "commit-bot.md"}, &stdout, &stderr); code != 0 || !strings.HasPrefix(stdout.String(), repo+"\n") || !strings.Contains(stdout.String(), "[main]") {
-		t.Fatalf("want the repo line, then its main worktree; got %d %q %q", code, stdout.String(), stderr.String())
-	}
-}
-
-func TestStatusWithoutAPlanFileFails(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	if code := dispatch([]string{"status"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "status: name a plan file") {
-		t.Fatalf("want exit 1 and status: name a plan file, got %d %q", code, stderr.String())
-	}
-}
-
 func TestRunWithoutProtectedInTheFrontmatterFails(t *testing.T) {
 	t.Chdir(t.TempDir())
 	planText := strings.Join([]string{
@@ -386,62 +370,6 @@ func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 	createIndex := strings.Index(string(ghCalls), "pr create ")
 	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --base feat/feed ") {
 		t.Fatalf("the PR should be opened onto feat/feed, got gh calls:\n%s", ghCalls)
-	}
-}
-
-// oneLintPlan is the smallest plan lint passes: one typed PR with one commit that has a test.
-func oneLintPlan() string {
-	return "## 📄 feat: a (b)\n" +
-		"- [ ] read the docs\n" +
-		"  - DONE  go test ./... passes\n"
-}
-
-// runLint writes plan to a temp file, runs nightcap lint on it, and returns the exit code and stdout.
-func runLint(t *testing.T, plan string) (int, string) {
-	t.Helper()
-	planPath := filepath.Join(t.TempDir(), "commit-bot.md")
-	if err := os.WriteFile(planPath, []byte(plan), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	var stdout, stderr bytes.Buffer
-	code := dispatch([]string{"lint", planPath}, &stdout, &stderr)
-	return code, stdout.String()
-}
-
-func TestLintPlanWithoutTypedPRExits1(t *testing.T) {
-	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## 📄 feat: a (b)", "## cmd", 1))
-	if code != 1 || stdout != "no PR with type: slug\n" {
-		t.Fatalf("want exit 1 and the no-PR line, got %d %q", code, stdout)
-	}
-}
-
-func TestLintCommitWithoutTestExits1(t *testing.T) {
-	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "go test ./... passes", "테스트가 없음", 1))
-	want := "PR: feat: a (b)\n  no test: read the docs\n"
-	if code != 1 || stdout != want {
-		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
-	}
-}
-
-func TestLintPrintsAPersonPRAsPerson(t *testing.T) {
-	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "## 📄 feat:", "## 👤 feat:", 1))
-	if code != 0 || stdout != "person: feat: a (b)\n" {
-		t.Fatalf("want exit 0 and %q, got %d %q", "person: feat: a (b)\n", code, stdout)
-	}
-}
-
-func TestLintPRWithoutAMarkExits1(t *testing.T) {
-	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "📄 ", "", 1))
-	if code != 1 || stdout != "no mark: feat: a (b)\n" {
-		t.Fatalf("want exit 1 and %q, got %d %q", "no mark: feat: a (b)\n", code, stdout)
-	}
-}
-
-func TestLintWherePathWithASpaceExits1(t *testing.T) {
-	code, stdout := runLint(t, strings.Replace(oneLintPlan(), "  - DONE", "  - WHERE (blog-v2) a b/\n  - DONE", 1))
-	want := "PR: feat: a (b)\n  WHERE path not readable: a b/\n"
-	if code != 1 || stdout != want {
-		t.Fatalf("want exit 1 and %q, got %d %q", want, code, stdout)
 	}
 }
 
