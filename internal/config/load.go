@@ -1,9 +1,10 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,10 +18,13 @@ var defaultAllowedTools = []string{
 	"Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)",
 }
 
-// Load reads <dir>/nightcap.yml and fills missing keys with defaults: max_turns 30, max_rounds 3, lang [ko], merge_method merge.
+// Load reads the nightcap.yml at path and fills missing keys with defaults: max_turns 30, max_rounds 3, lang [ko], merge_method merge.
 // An empty work_start turns the before-work limit off.
-func Load(dir string) (Config, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, FileName))
+func Load(path string) (Config, error) {
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return Config{}, fmt.Errorf("config: %s not found, copy examples/nightcap.yml there", path)
+	}
 	if err != nil {
 		return Config{}, err
 	}

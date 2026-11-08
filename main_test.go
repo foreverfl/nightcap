@@ -54,11 +54,16 @@ func writePlan(t *testing.T, repo, test string) {
 	}
 }
 
-// writePlanAndConfig writes commit-bot.md through writePlan, then nightcap.yml with configYAML as its whole text.
+// writePlanAndConfig writes commit-bot.md through writePlan, then nightcap.yml with configYAML under a temp XDG_CONFIG_HOME.
 func writePlanAndConfig(t *testing.T, repo, test, configYAML string) {
 	t.Helper()
 	writePlan(t, repo, test)
-	if err := os.WriteFile("nightcap.yml", []byte(configYAML), 0o644); err != nil {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	if err := os.MkdirAll(filepath.Join(configHome, "nightcap"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configHome, "nightcap", "nightcap.yml"), []byte(configYAML), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

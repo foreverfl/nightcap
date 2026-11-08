@@ -17,6 +17,7 @@ import (
 	"nightcap/internal/events"
 	"nightcap/internal/git"
 	"nightcap/internal/notify"
+	"nightcap/internal/path"
 	"nightcap/internal/plan"
 	"nightcap/internal/pr"
 	"nightcap/internal/state"
@@ -44,7 +45,11 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	if meta.Repo == "" || meta.Test == "" || meta.Protected == nil || meta.Dependencies == nil {
 		return errors.New("run: the plan's frontmatter needs repo, test, protected and dependencies")
 	}
-	loaded, err := config.Load(".")
+	configPath, err := path.ConfigFile()
+	if err != nil {
+		return err
+	}
+	loaded, err := config.Load(configPath)
 	if err != nil {
 		return err
 	}
