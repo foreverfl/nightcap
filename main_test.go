@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"maps"
 	"os"
 	"os/exec"
@@ -120,6 +121,10 @@ func TestDispatchRunPrintsPickedSection(t *testing.T) {
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
+	wantKinds := []string{"run_start", "commit_start", "round", "test", "verdict", "pr_open", "run_end"}
+	if kinds := runFileKinds(t, repo); !slices.Equal(kinds, wantKinds) {
+		t.Fatalf("kinds = %v, want %v", kinds, wantKinds)
+	}
 }
 
 func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
@@ -136,6 +141,42 @@ func TestRunMarksUnitBlockedAfterMaxRounds(t *testing.T) {
 	}
 	if !strings.HasSuffix(stdout.String(), "  check: red\n  blocked\n") {
 		t.Fatalf("stdout should end with a red check and blocked, got %q", stdout.String())
+	}
+}
+
+// runFileKinds reads the one run file a run left under repo's .nightcap/runs and returns the kind of each line in order.
+func runFileKinds(t *testing.T, repo string) []string {
+	t.Helper()
+	runFiles, _ := filepath.Glob(filepath.Join(repo, ".nightcap/runs/*/*.jsonl"))
+	if len(runFiles) != 1 {
+		t.Fatalf("one run should leave one run file, got %v", runFiles)
+	}
+	text, err := os.ReadFile(runFiles[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	for line := range strings.SplitSeq(strings.TrimSpace(string(text)), "\n") {
+		var event struct{ Kind string }
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatal(err)
+		}
+		kinds = append(kinds, event.Kind)
+	}
+	return kinds
+}
+
+func TestRunLogsEachRoundAndTestToTheRunFile(t *testing.T) {
+	repo := setUpRepoWithOneUnitPlan(t)
+	useFakeClaude(t)
+	writePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
+	var stdout, stderr bytes.Buffer
+	if code := dispatch([]string{"run", "commit-bot.md"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr.String())
+	}
+	want := []string{"run_start", "commit_start", "round", "test", "round", "test", "blocked", "run_end"}
+	if kinds := runFileKinds(t, repo); !slices.Equal(kinds, want) {
+		t.Fatalf("kinds = %v, want %v", kinds, want)
 	}
 }
 
@@ -189,6 +230,10 @@ func TestRunMarksUnitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	}
 	if !strings.HasSuffix(stdout.String(), "  verdict: red (changed a dependency file: go.sum)\n  blocked\n") {
 		t.Fatalf("stdout should end with a red verdict and blocked, got %q", stdout.String())
+	}
+	want := []string{"run_start", "commit_start", "round", "test", "verdict", "round", "test", "verdict", "blocked", "run_end"}
+	if kinds := runFileKinds(t, repo); !slices.Equal(kinds, want) {
+		t.Fatalf("kinds = %v, want %v", kinds, want)
 	}
 }
 

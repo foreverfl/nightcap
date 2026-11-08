@@ -15,6 +15,7 @@ import (
 	"nightcap/internal/check"
 	"nightcap/internal/client/claude"
 	"nightcap/internal/config"
+	"nightcap/internal/events"
 	"nightcap/internal/git"
 	"nightcap/internal/notify"
 	"nightcap/internal/plan"
@@ -27,7 +28,7 @@ import (
 // For now it picks the plan's top heading that has a unit to take, checks its branch out in a worktree of the frontmatter's repo and runs
 // the first unit that has a check through runUnit; it returns an error when no plan file is named,
 // or when the config, the plan file, git, claude or sh fails.
-func Run(args []string, stdout io.Writer) error {
+func Run(args []string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
 		return errors.New("run: name a plan file")
 	}
@@ -54,7 +55,19 @@ func Run(args []string, stdout io.Writer) error {
 	var startUsage usage.Usage // the first /usage read before a unit, so a night that runs nothing never calls claude
 	statePath := filepath.Join(meta.Repo, ".nightcap", "state.json")
 	var pickedSection *plan.Section // the heading tonight took; nil when there was none
-	defer func() { sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedSection, started, startUsage) }()
+	// one file per run, under its start date: .nightcap/runs/261108/225500.jsonl
+	runPath := filepath.Join(meta.Repo, ".nightcap", "runs", started.Format("060102"), started.Format("150405")+".jsonl")
+	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
+	defer func() {
+		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedSection, started, startUsage)
+		reason := ""
+		if runErr != nil {
+			reason = runErr.Error()
+		} else if pickedSection != nil {
+			reason = stopReason(statePath, *pickedSection, started)
+		}
+		appendEvent(runPath, events.Event{Kind: "run_end", At: time.Now(), Reason: reason})
+	}()
 
 	saved, err := state.Load(statePath)
 	if err != nil {
@@ -133,10 +146,10 @@ func Run(args []string, stdout io.Writer) error {
 			fmt.Fprintf(stdout, "  stop: %s\n", reason)
 			return state.SaveUnit(statePath, section.Slug, unit.Title, state.Unit{Result: "stopped", Reason: reason})
 		}
-		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath); err != nil {
+		if err := runUnit(ctx, stdout, loaded, meta, worktreeDir, base, section.Slug, index+1, unit, statePath, runPath); err != nil {
 			return err
 		}
-		if err := openPR(ctx, stdout, statePath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
+		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[section.Slug], section, unit.Title, hasPR[section.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
 			return err
 		}
 		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, section); err != nil {
@@ -149,15 +162,18 @@ func Run(args []string, stdout io.Writer) error {
 
 // runUnit runs claude then the check on one unit up to MaxRounds times, feeding a red check's tail or a red verdict's
 // reason into the next prompt. It prints "blocked" when the rounds run out, the same failure comes back twice in a row,
-// or claude stops before Done. Every round's outcome goes into the state file at statePath.
+// or claude stops before Done. Every round's outcome goes into the state file at statePath,
+// and commit_start, each round and each test go as lines into the run file at runPath.
 // It returns an error only when claude, sh, git or the state file fails.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Unit, statePath string) error {
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Unit, statePath, runPath string) error {
 	failureTail := ""
 	sessionID := ""
 	record := state.Unit{}
+	appendEvent(runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: unit.Title})
 	for round := 1; round <= loaded.MaxRounds; round++ {
 		record.Attempts = round
 		logPath := filepath.Join(meta.Repo, ".nightcap", "logs", slug, fmt.Sprintf("unit%d-round%d.log", number, round))
+		roundStarted := time.Now()
 		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(unit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
 		if err != nil {
 			return err
@@ -165,6 +181,8 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 		if result.SessionID != "" {
 			sessionID = result.SessionID
 		}
+		appendEvent(runPath, events.Event{Kind: "round", At: time.Now(), PR: slug, Commit: unit.Title,
+			Round: round, Seconds: int(time.Since(roundStarted).Seconds()), SessionID: result.SessionID})
 		fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", unit.Title, result.Outcome, logPath)
 		if result.Outcome == claude.RateLimited {
 			usageJSON, _ := claude.Usage(ctx)
@@ -192,6 +210,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 			return err
 		}
 		fmt.Fprintf(stdout, "  check: %s\n", color(checked.Green))
+		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: unit.Title, Result: color(checked.Green)})
 		failure := checked.Tail
 		record.Result, record.Reason, record.CheckTail = "red", "", checked.Tail
 		// 2. Classify: sort what the branch changed by the rules in check/classify.go
@@ -206,6 +225,9 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 				if verdict.ReadCode {
 					record.Result = "read-code"
 				}
+			}
+			appendEvent(runPath, events.Event{Kind: "verdict", At: time.Now(), PR: slug, Commit: unit.Title, Result: record.Result, Reason: verdict.Reason})
+			if !verdict.Red {
 				return state.SaveUnit(statePath, slug, unit.Title, record)
 			}
 			failure = verdict.Reason
@@ -220,6 +242,7 @@ func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta p
 		failureTail = failure
 	}
 	fmt.Fprintln(stdout, "  blocked")
+	appendEvent(runPath, events.Event{Kind: "blocked", At: time.Now(), PR: slug, Commit: unit.Title})
 	record.Result = "blocked"
 	return state.SaveUnit(statePath, slug, unit.Title, record)
 }
@@ -299,8 +322,9 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 
 // openPR pushes section's branch from worktreeDir once unitTitle has ended green or read-code in the state file at statePath,
 // then opens a PR, or with hasPR replaces its description, listing every finished unit (English above Korean when
-// isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack. It returns an error when git, gh or the state file fails.
-func openPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
+// isEnglishWanted). A new PR on top of the open PR at previousURL joins its stack, and a pr_open line goes into the run file at runPath.
+// It returns an error when git, gh or the state file fails.
+func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, section plan.Section, unitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -348,6 +372,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, worktreeDir, base,
 		return err
 	}
 	fmt.Fprintf(stdout, "  PR: %s\n", prURL)
+	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: section.Slug, Commit: unitTitle, URL: prURL})
 	if previousURL != "" {
 		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
 			return err
@@ -463,4 +488,11 @@ func stopReason(statePath string, section plan.Section, started time.Time) strin
 		}
 	}
 	return ""
+}
+
+// appendEvent adds event to the run file at path; a failed write only prints to stderr, so the log never stops a run.
+func appendEvent(path string, event events.Event) {
+	if err := events.Append(path, event); err != nil {
+		fmt.Fprintln(os.Stderr, "events:", err)
+	}
 }
