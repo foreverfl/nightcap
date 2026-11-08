@@ -16,7 +16,7 @@ var checkNames = []string{"hurl", "go test", "make check", "cargo test", "npm te
 // Headings without a known type or a slug are skipped together with the units under them.
 func Parse(text string) []PR {
 	var sections []PR
-	var current *Unit
+	var current *Commit
 	underTypedHeading := false
 	inFence := false
 
@@ -27,7 +27,7 @@ func Parse(text string) []PR {
 		current.Body = strings.TrimRight(current.Body, "\n")
 		current.HasCheck = hasCheck(current.Body)
 		last := &sections[len(sections)-1]
-		last.Units = append(last.Units, *current)
+		last.Commits = append(last.Commits, *current)
 		current = nil
 	}
 
@@ -65,12 +65,12 @@ func Parse(text string) []PR {
 			continue
 		}
 		if title, ok := strings.CutPrefix(line, "- [ ] "); ok {
-			current = &Unit{Title: title, Body: line + "\n"}
+			current = &Commit{Title: title, Body: line + "\n"}
 			continue
 		}
 		last := &sections[len(sections)-1]
 		isPlainLine := line != "" && !isIndented(line) && !strings.HasPrefix(line, "- ")
-		if last.Summary == "" && len(last.Units) == 0 && isPlainLine {
+		if last.Summary == "" && len(last.Commits) == 0 && isPlainLine {
 			last.Summary = line
 		}
 	}
@@ -84,7 +84,7 @@ func Pick(sections []PR) (PR, bool) {
 		if section.IsPerson() || section.Mark == MarkNone {
 			continue
 		}
-		for _, unit := range section.Units {
+		for _, unit := range section.Commits {
 			if unit.HasCheck {
 				return section, true
 			}

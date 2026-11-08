@@ -25,9 +25,9 @@ type PR struct {
 	Mark    Mark
 	Type    string // feat, fix, test, docs, refactor or chore
 	Title   string
-	Slug    string // branch is Type + "/" + Slug
-	Summary string // first plain line under the heading, used as the PR body's first sentence
-	Units   []Unit // open "- [ ]" units only
+	Slug    string   // branch is Type + "/" + Slug
+	Summary string   // first plain line under the heading, used as the PR body's first sentence
+	Commits []Commit // open "- [ ]" units only
 }
 
 // IsPerson reports whether a person does this PR by hand, so a night run never takes it.
@@ -36,7 +36,7 @@ func (section PR) IsPerson() bool {
 }
 
 // Unit is one open checkbox under a Section; it becomes one commit.
-type Unit struct {
+type Commit struct {
 	Title    string
 	Body     string // the checkbox line plus its indented lines, fences included
 	HasCheck bool   // the DONE line names a check, so a night run may take it

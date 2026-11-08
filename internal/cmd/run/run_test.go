@@ -87,7 +87,7 @@ func TestRunUnitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 	statePath := filepath.Join(repo, ".nightcap", "state.json")
 	loaded := config.Config{MaxRounds: 3}
 	meta := plan.Meta{Repo: repo, Test: "true"}
-	unit := plan.Unit{Title: "add it"}
+	unit := plan.Commit{Title: "add it"}
 	if err := runUnit(context.Background(), io.Discard, loaded, meta, repo, "main", "feed", 1, unit, statePath, filepath.Join(repo, ".nightcap", "runs", "run.jsonl")); err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	section := plan.PR{Mark: plan.MarkAuto, Type: "test", Title: "피드 hurl 파일", Slug: "feed-hurl",
-		Units: []plan.Unit{{Title: "list feeds"}, {Title: "add a feed"}, {Title: "delete a feed"}}}
+		Commits: []plan.Commit{{Title: "list feeds"}, {Title: "add a feed"}, {Title: "delete a feed"}}}
 	got, err := prSummary(statePath, section)
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +134,7 @@ func TestPRSummaryCountsGreenUnitsAndTakesThePRLink(t *testing.T) {
 func TestStopReasonReportsOnlyTonightsStop(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	started := time.Date(2026, 11, 8, 23, 0, 0, 0, time.UTC)
-	section := plan.PR{Slug: "feed-hurl", Units: []plan.Unit{{Title: "list feeds"}}}
+	section := plan.PR{Slug: "feed-hurl", Commits: []plan.Commit{{Title: "list feeds"}}}
 	for _, tc := range []struct {
 		updatedAt time.Time
 		want      string

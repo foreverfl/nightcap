@@ -91,7 +91,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 			fmt.Fprintf(stdout, "stop %s: blocked, the headings below wait\n", section.Title)
 			break // plans are written top to bottom, so a heading below stands on this one
 		}
-		if len(section.Units) > 0 {
+		if len(section.Commits) > 0 {
 			view, err := pr.ViewBranch(meta.Repo, section.Type+"/"+section.Slug)
 			if err != nil {
 				return err
@@ -124,7 +124,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		return err
 	}
 	fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", planPath, branch, worktreeDir)
-	for _, unit := range section.Units {
+	for _, unit := range section.Commits {
 		mark := "skip"
 		if unit.HasCheck {
 			mark = "take"
@@ -132,7 +132,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		fmt.Fprintf(stdout, "  %s  %s\n", mark, unit.Title)
 	}
 
-	for index, unit := range section.Units {
+	for index, unit := range section.Commits {
 		if !unit.HasCheck {
 			continue
 		}
@@ -165,7 +165,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 // or claude stops before Done. Every round's outcome goes into the state file at statePath,
 // and commit_start, each round and each test go as lines into the run file at runPath.
 // It returns an error only when claude, sh, git or the state file fails.
-func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Unit, statePath, runPath string) error {
+func runUnit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, unit plan.Commit, statePath, runPath string) error {
 	failureTail := ""
 	sessionID := ""
 	record := state.Unit{}
@@ -296,7 +296,7 @@ func color(green bool) string {
 
 // classifyBranch prints the files and the count of lines worktreeDir's branch changed, then the verdict on them.
 // It returns that verdict, or an error when git fails.
-func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, unit plan.Unit) (check.Verdict, error) {
+func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, unit plan.Commit) (check.Verdict, error) {
 	changes, err := git.ChangedFiles(worktreeDir, base)
 	if err != nil {
 		return check.Verdict{}, err
@@ -385,7 +385,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 // in sectionState, in plan order, and the last check tail of lastUnitTitle.
 func bodyInput(section plan.PR, sectionState state.Section, lastUnitTitle string) pr.BodyInput {
 	input := pr.BodyInput{Summary: section.Summary, CheckTail: sectionState.Units[lastUnitTitle].CheckTail}
-	for _, unit := range section.Units {
+	for _, unit := range section.Commits {
 		record := sectionState.Units[unit.Title]
 		if record.Result != "green" && record.Result != "read-code" {
 			continue
@@ -405,7 +405,7 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	if err != nil {
 		return err
 	}
-	for _, unit := range section.Units {
+	for _, unit := range section.Commits {
 		result := saved.Sections[section.Slug].Units[unit.Title].Result
 		if result != "green" && result != "read-code" {
 			return nil
@@ -464,10 +464,10 @@ func prSummary(statePath string, section plan.PR) (notify.PR, error) {
 	prResult := notify.PR{
 		Mark:  section.Mark,
 		Title: fmt.Sprintf("%s: %s (%s)", section.Type, section.Title, section.Slug),
-		Total: len(section.Units),
+		Total: len(section.Commits),
 		URL:   sectionState.PRURL,
 	}
-	for _, unit := range section.Units {
+	for _, unit := range section.Commits {
 		result := sectionState.Units[unit.Title].Result
 		if result == "green" || result == "read-code" {
 			prResult.Done++

@@ -39,7 +39,7 @@ func Run(args []string, stdout io.Writer) error {
 			continue
 		}
 		fmt.Fprintf(stdout, "heading: %s: %s (%s)\n", section.Type, section.Title, section.Slug)
-		for _, unit := range section.Units {
+		for _, unit := range section.Commits {
 			if !unit.HasCheck {
 				fmt.Fprintf(stdout, "  no check: %s\n", unit.Title)
 				hasProblem = true
