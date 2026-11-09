@@ -26,7 +26,7 @@ import (
 	"nightcap/internal/verdict"
 )
 
-// Run takes the top PR of the plan file args[0] that has a commit to run, and runs that commit in a worktree of the frontmatter's repo.
+// Run takes the top PR of the plan file args[0] that has a commit to run, and runs its open commits one after another in a worktree of the frontmatter's repo, stopping at the first that is not accepted.
 // It fails when no plan file is named or the frontmatter leaves a key out, and when the config, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
@@ -165,15 +165,32 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		if err := runCommit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, commit, statePath, runPath); err != nil {
 			return err
 		}
+		accepted, err := isAccepted(statePath, planPR.Slug, commit.Title)
+		if err != nil {
+			return err
+		}
+		if !accepted {
+			return nil // red, blocked or stopped: the commits below stand on this one
+		}
 		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
 			return err
 		}
+		hasPR[planPR.Slug] = true
 		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, planPR); err != nil {
 			return err
 		}
-		break
 	}
 	return nil
+}
+
+// isAccepted reports whether commitTitle ended green or read-code in the state file.
+func isAccepted(statePath, slug, commitTitle string) (bool, error) {
+	saved, err := state.Load(statePath)
+	if err != nil {
+		return false, err
+	}
+	result := saved.PRs[slug].Commits[commitTitle].Result
+	return result == "green" || result == "read-code", nil
 }
 
 // runCommit runs claude and the test on one commit until the test is green or MaxRounds is spent.
@@ -330,16 +347,11 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 	return result, nil
 }
 
-// openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR, once commitTitle has ended green or read-code.
+// openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR. The caller has checked that commitTitle was accepted.
 func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
-	}
-	result := saved.PRs[planPR.Slug].Commits[commitTitle].Result
-	isAccepted := result == "green" || result == "read-code"
-	if !isAccepted {
-		return nil
 	}
 	branch := planPR.Type + "/" + planPR.Slug
 	if err := git.Push(worktreeDir, branch); err != nil {

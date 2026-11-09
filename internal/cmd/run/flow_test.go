@@ -256,3 +256,38 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 		t.Fatalf("round 1 should start a session and round 2 resume s1\nround 1: %s\nround 2: %s", first, second)
 	}
 }
+
+func TestRunRunsEveryOpenCommitOfThePR(t *testing.T) {
+	testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	ghCalls := testsetup.UseFakeGh(t, nil)
+	planFile, err := os.OpenFile("commit-bot.md", os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// a second commit under feed, which the same run must take after the first
+	secondCommit := strings.Join([]string{
+		"",
+		"- [ ] show it",
+		"  - DONE  go test passes",
+	}, "\n") + "\n"
+	if _, err := planFile.WriteString(secondCommit); err != nil {
+		t.Fatal(err)
+	}
+	planFile.Close()
+	var stdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
+		t.Fatal(err)
+	}
+	if ran := strings.Count(stdout.String(), "  ran  "); ran != 2 {
+		t.Fatalf("one run should take both commits, got %d in %q", ran, stdout.String())
+	}
+	calls, err := os.ReadFile(ghCalls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creates, edits := strings.Count(string(calls), "pr create "), strings.Count(string(calls), "pr edit feat/feed --body-file")
+	if creates != 1 || edits != 1 {
+		t.Fatalf("the second commit should edit the PR, not open another: %d create, %d edit\n%s", creates, edits, calls)
+	}
+}
