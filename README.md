@@ -2,7 +2,7 @@
 
 English | [한국어](README-ko.md) | [日本語](README-ja.md)
 
-Runs Claude Code overnight against one PR of a plan file, one commit at a time, and opens a PR that a person merges in the morning.
+Runs Claude Code overnight down a plan file, one commit at a time and one PR after another, and leaves the PRs stacked for a person to merge in the morning.
 
 ## Install
 
@@ -15,7 +15,7 @@ It puts the latest release in `~/.local/bin/nightcap` and adds that folder to PA
 ## Usage
 
 ```sh
-nightcap run ~/work/todolist/blog-v2/commit-bot.md     # runs the next commit of the top PR that has one
+nightcap run ~/work/todolist/blog-v2/commit-bot.md     # runs every open commit, PR by PR, until nothing is left, a commit fails or usage runs out
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # prints the plan's repo and its worktrees
 nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # prints what a night run cannot use
 nightcap init                                          # writes the example config to ~/.config/nightcap/nightcap.yml

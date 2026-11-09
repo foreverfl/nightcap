@@ -2,7 +2,7 @@
 
 [English](README.md) | 한국어 | [日本語](README-ja.md)
 
-계획 문서의 PR 하나를 집어 밤사이 Claude Code로 커밋을 하나씩 구현하고, 아침에 사람이 합칠 PR을 연다.
+밤사이 Claude Code로 계획 문서를 위에서부터 커밋 하나씩, PR 하나씩 구현하고, 아침에 사람이 합칠 PR들을 stack으로 쌓아 둔다.
 
 ## 설치
 
@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/foreverfl/nightcap/main/install.sh 
 ## 사용법
 
 ```sh
-nightcap run ~/work/todolist/blog-v2/commit-bot.md     # 커밋이 남은 맨 위 PR의 다음 커밋을 돌린다
+nightcap run ~/work/todolist/blog-v2/commit-bot.md     # 열린 커밋을 PR 순서대로 전부 돌린다. 다 끝나거나, 커밋이 실패하거나, 사용량이 차면 멈춘다
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # 계획의 레포와 그 워크트리를 찍는다
 nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # 밤 실행이 쓸 수 없는 것을 찍는다
 nightcap init                                          # 예시 설정을 ~/.config/nightcap/nightcap.yml에 쓴다

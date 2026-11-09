@@ -21,15 +21,16 @@ func TestRunPrintsPickedPR(t *testing.T) {
 	}
 	want := strings.Join([]string{
 		"commit-bot.md",
-		"  branch: feat/feed",
-		"  worktree: " + filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees/feed"),
+		"  branch: feat/first",
+		"  worktree: " + filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees/first"),
 		"  take  add it",
-		"  ran  add it: done (log: " + filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round1.log") + ")",
+		"  ran  add it: done (log: " + filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/commit1-round1.log") + ")",
 		"  test: green",
 		"  added lines: 0",
 		"  verdict: green",
-		"  PR: https://github.com/foreverfl/feed/pull/1",
+		"  PR: https://github.com/foreverfl/first/pull/1",
 		"  label: nightcap:read-pr",
+		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())
@@ -48,7 +49,7 @@ func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("max_rounds 2 should leave 2 round logs, got %d: %v", len(logs), logs)
 	}
@@ -79,7 +80,7 @@ func TestRunMarksCommitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("`false` fails the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -104,7 +105,7 @@ func TestRunMarksCommitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("go.sum turns the verdict red the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -125,10 +126,10 @@ func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// a second PR below feed, which must wait while feed is blocked
+	// a second PR below first, which must wait while first is blocked
 	secondPR := strings.Join([]string{
 		"",
-		"## 📄 feat: feed page (feed-page)",
+		"## 📄 feat: second (second)",
 		"",
 		"- [ ] show it",
 		"  - DONE  go test passes",
@@ -145,7 +146,7 @@ func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
 		t.Fatalf("second run: %v", err)
 	}
 	want := strings.Join([]string{
-		"stop feed: blocked, the PRs below wait",
+		"stop first: blocked, the PRs below wait",
 		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if secondStdout.String() != want {
@@ -155,13 +156,13 @@ func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
 
 func TestRunSkipsAPRThatWasMerged(t *testing.T) {
 	testsetup.SetUpRepoWithOneCommitPlan(t)
-	testsetup.UseFakeGh(t, map[string]string{"feat/feed": "MERGED"})
+	testsetup.UseFakeGh(t, map[string]string{"feat/first": "MERGED"})
 	var stdout bytes.Buffer
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	want := strings.Join([]string{
-		"skip feed: PR merged",
+		"skip first: PR merged",
 		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if stdout.String() != want {
@@ -206,11 +207,11 @@ func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 		"dependencies: []",
 		"---",
 		"",
-		"## 📄 feat: feed (feed)",
+		"## 📄 feat: first (first)",
 		"",
 		"- [ ] add it",
 		"",
-		"## 📄 feat: feed page (feed-page)",
+		"## 📄 feat: second (second)",
 		"",
 		"- [ ] show it",
 		"  - DONE  go test passes",
@@ -218,10 +219,10 @@ func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 	if err := os.WriteFile("commit-bot.md", planText, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if output, err := exec.Command("git", "-C", repo, "branch", "feat/feed").CombinedOutput(); err != nil {
+	if output, err := exec.Command("git", "-C", repo, "branch", "feat/first").CombinedOutput(); err != nil {
 		t.Fatalf("git branch: %v\n%s", err, output)
 	}
-	ghCallsPath := testsetup.UseFakeGh(t, map[string]string{"feat/feed": "OPEN"})
+	ghCallsPath := testsetup.UseFakeGh(t, map[string]string{"feat/first": "OPEN"})
 	var stdout bytes.Buffer
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
@@ -231,8 +232,8 @@ func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	createIndex := strings.Index(string(ghCalls), "pr create ")
-	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --base feat/feed ") {
-		t.Fatalf("the PR should be opened onto feat/feed, got gh calls:\n%s", ghCalls)
+	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --base feat/first ") {
+		t.Fatalf("the PR should be opened onto feat/first, got gh calls:\n%s", ghCalls)
 	}
 }
 
@@ -250,9 +251,81 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	first, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round1.log"))
-	second, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round2.log"))
+	first, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/commit1-round1.log"))
+	second, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/commit1-round2.log"))
 	if strings.Contains(string(first), "--resume") || !strings.Contains(string(second), "--resume s1") {
 		t.Fatalf("round 1 should start a session and round 2 resume s1\nround 1: %s\nround 2: %s", first, second)
+	}
+}
+
+func TestRunRunsEveryOpenCommitOfThePR(t *testing.T) {
+	testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	ghCalls := testsetup.UseFakeGh(t, nil)
+	planFile, err := os.OpenFile("commit-bot.md", os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// a second commit under first, which the same run must take after the first
+	secondCommit := strings.Join([]string{
+		"",
+		"- [ ] show it",
+		"  - DONE  go test passes",
+	}, "\n") + "\n"
+	if _, err := planFile.WriteString(secondCommit); err != nil {
+		t.Fatal(err)
+	}
+	planFile.Close()
+	var stdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
+		t.Fatal(err)
+	}
+	if ran := strings.Count(stdout.String(), "  ran  "); ran != 2 {
+		t.Fatalf("one run should take both commits, got %d in %q", ran, stdout.String())
+	}
+	calls, err := os.ReadFile(ghCalls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creates, edits := strings.Count(string(calls), "pr create "), strings.Count(string(calls), "pr edit feat/first --body-file")
+	if creates != 1 || edits != 1 {
+		t.Fatalf("the second commit should edit the PR, not open another: %d create, %d edit\n%s", creates, edits, calls)
+	}
+}
+
+func TestRunDoesNotRunACommitThatIsAlreadyGreen(t *testing.T) {
+	testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	var firstStdout, secondStdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &firstStdout); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	if err := Run([]string{"commit-bot.md"}, &secondStdout); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if strings.Contains(secondStdout.String(), "  ran  ") {
+		t.Fatalf("the second run should skip the commit the first one finished, got %q", secondStdout.String())
+	}
+}
+
+func TestRunTakesThePRBelowOnceThePRAboveIsDone(t *testing.T) {
+	testsetup.SetUpRepoWithOneCommitPlan(t) // PR first with one commit
+	testsetup.UseFakeClaude(t)
+	ghCalls := testsetup.UseFakeGh(t, nil)
+	testsetup.AppendToPlan(t, "## 📄 feat: second (second)", "", "- [ ] show it", "  - DONE  go test passes")
+
+	var stdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil { // one run: first, then second
+		t.Fatal(err)
+	}
+
+	calls, _ := os.ReadFile(ghCalls)
+	for _, want := range []string{"pr create --base main --title feat: first ", "pr create --base feat/first --title feat: second "} {
+		if !strings.Contains(string(calls), want) {
+			t.Fatalf("gh calls should contain %q\n%s", want, calls)
+		}
+	}
+	if !strings.HasSuffix(stdout.String(), "commit-bot.md: nothing to take\n") {
+		t.Fatalf("the run should go on until nothing is left, got %q", stdout.String())
 	}
 }

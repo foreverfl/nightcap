@@ -26,7 +26,7 @@ import (
 	"nightcap/internal/verdict"
 )
 
-// Run takes the top PR of the plan file args[0] that has a commit to run, and runs that commit in a worktree of the frontmatter's repo.
+// Run goes down the plan file args[0] PR by PR, running every open commit in a worktree of the frontmatter's repo, until nothing is left or a commit is not accepted.
 // It fails when no plan file is named or the frontmatter leaves a key out, and when the config, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
@@ -67,24 +67,39 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		return err
 	}
 	worktreesDir := filepath.Join(cacheDir, "worktrees")
-	var pickedPR *plan.PR // the PR tonight took; nil when there was none
+	var pickedPRs []plan.PR // the PRs tonight took, top to bottom
 	// one file per run, under its start date: ~/.local/share/nightcap/blog-v2/runs/261108/225500.jsonl
 	runPath := filepath.Join(dataDir, "runs", started.Format("060102"), started.Format("150405")+".jsonl")
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
-		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPR, started, startUsage)
+		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPRs, started, startUsage)
 		reason := ""
 		if runErr != nil {
 			reason = runErr.Error()
-		} else if pickedPR != nil {
-			reason = stopReason(statePath, *pickedPR, started)
+		} else if len(pickedPRs) > 0 {
+			reason = stopReason(statePath, pickedPRs[len(pickedPRs)-1], started)
 		}
 		appendEvent(runPath, events.Event{Kind: "run_end", At: time.Now(), Reason: reason})
 	}()
 
+	// a PR whose commits all ended accepted lets the next pass take the PR below it
+	for {
+		picked, finished, err := runNextPR(ctx, stdout, loaded, meta, planPath, string(planText), statePath, worktreesDir, runPath, &startUsage)
+		if picked != nil {
+			pickedPRs = append(pickedPRs, *picked)
+		}
+		if err != nil || !finished {
+			return err
+		}
+	}
+}
+
+// runNextPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
+// picked is that PR, nil when there was none; finished is true when every commit of it ended accepted.
+func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, planPath, planText, statePath, worktreesDir, runPath string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
 	saved, err := state.Load(statePath)
 	if err != nil {
-		return err
+		return picked, false, err
 	}
 	var notBlocked []plan.PR
 	hasPR := map[string]bool{}
@@ -92,7 +107,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	previousOpenBranch := ""
 	stackOnto := map[string]string{}
 	previousOpenURL := ""
-	for _, planPR := range plan.Parse(string(planText)) {
+	for _, planPR := range plan.Parse(planText) {
 		baseFor[planPR.Slug] = "main"
 		if previousOpenBranch != "" {
 			baseFor[planPR.Slug] = previousOpenBranch
@@ -107,14 +122,14 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		if len(planPR.Commits) > 0 {
 			view, err := pr.ViewBranch(meta.Repo, planPR.Type+"/"+planPR.Slug)
 			if err != nil {
-				return err
+				return picked, false, err
 			}
 			if err := state.SavePRStatus(statePath, planPR.Slug, view.URL, view.State); err != nil {
-				return err
+				return picked, false, err
 			}
 			if view.State == "MERGED" || view.State == "CLOSED" {
 				if err := removeWorktreeIfAny(stdout, meta.Repo, filepath.Join(worktreesDir, planPR.Slug), planPR.Slug, view.State); err != nil {
-					return err
+					return picked, false, err
 				}
 				fmt.Fprintf(stdout, "skip %s: PR %s\n", planPR.Title, strings.ToLower(view.State))
 				continue
@@ -125,19 +140,22 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 				previousOpenURL = view.URL
 			}
 		}
+		if isPRDone(saved.PRs[planPR.Slug], planPR) {
+			continue // its branch above still becomes the base of the PR below
+		}
 		notBlocked = append(notBlocked, planPR)
 	}
 	planPR, ok := plan.Pick(notBlocked)
 	if !ok {
 		fmt.Fprintf(stdout, "%s: nothing to take\n", planPath)
-		return nil
+		return nil, false, nil
 	}
-	pickedPR = &planPR
+	picked = &planPR
 	base := baseFor[planPR.Slug]
 	branch := planPR.Type + "/" + planPR.Slug
 	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, filepath.Join(worktreesDir, planPR.Slug))
 	if err != nil {
-		return err
+		return picked, false, err
 	}
 	fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", planPath, branch, worktreeDir)
 	for _, commit := range planPR.Commits {
@@ -152,28 +170,59 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		if !commit.HasTest {
 			continue
 		}
+		if done, _ := isAccepted(statePath, planPR.Slug, commit.Title); done {
+			continue // done in an earlier run; the plan still shows it as [ ]
+		}
 		// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
 		usageJSON, _ := claude.Usage(ctx)
 		current, _ := usage.Read(usageJSON)
 		if !startUsage.Known {
-			startUsage = current
+			*startUsage = current
 		}
 		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
 			fmt.Fprintf(stdout, "  stop: %s\n", reason)
-			return state.SaveCommit(statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
+			return picked, false, state.SaveCommit(statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
 		if err := runCommit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, commit, statePath, runPath); err != nil {
-			return err
+			return picked, false, err
+		}
+		accepted, err := isAccepted(statePath, planPR.Slug, commit.Title)
+		if err != nil {
+			return picked, false, err
+		}
+		if !accepted {
+			return picked, false, nil // red, blocked or stopped: the commits below stand on this one
 		}
 		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
-			return err
+			return picked, false, err
 		}
+		hasPR[planPR.Slug] = true
 		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, planPR); err != nil {
-			return err
+			return picked, false, err
 		}
-		break
 	}
-	return nil
+	return picked, true, nil
+}
+
+// isAccepted reports whether commitTitle ended green or read-code in the state file.
+func isAccepted(statePath, slug, commitTitle string) (bool, error) {
+	saved, err := state.Load(statePath)
+	if err != nil {
+		return false, err
+	}
+	result := saved.PRs[slug].Commits[commitTitle].Result
+	return result == "green" || result == "read-code", nil
+}
+
+// isPRDone reports whether every commit of planPR that has a check ended green or read-code.
+func isPRDone(savedPR state.PR, planPR plan.PR) bool {
+	for _, commit := range planPR.Commits {
+		result := savedPR.Commits[commit.Title].Result
+		if commit.HasTest && result != "green" && result != "read-code" {
+			return false
+		}
+	}
+	return true
 }
 
 // runCommit runs claude and the test on one commit until the test is green or MaxRounds is spent.
@@ -330,16 +379,11 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 	return result, nil
 }
 
-// openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR, once commitTitle has ended green or read-code.
+// openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR. The caller has checked that commitTitle was accepted.
 func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR, isEnglishWanted bool) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
-	}
-	result := saved.PRs[planPR.Slug].Commits[commitTitle].Result
-	isAccepted := result == "green" || result == "read-code"
-	if !isAccepted {
-		return nil
 	}
 	branch := planPR.Type + "/" + planPR.Slug
 	if err := git.Push(worktreeDir, branch); err != nil {
@@ -433,16 +477,18 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 }
 
 // sendNightSummary sends the morning message; a failed send only prints to stderr, so it never changes the run's result.
-func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedPR *plan.PR, started time.Time, startUsage usage.Usage) {
+func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedPRs []plan.PR, started time.Time, startUsage usage.Usage) {
 	summary := notify.Summary{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
-	if pickedPR != nil {
-		prResult, err := prSummary(statePath, *pickedPR)
+	for _, pickedPR := range pickedPRs {
+		prResult, err := prSummary(statePath, pickedPR)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "notify:", err)
-		} else {
-			summary.PRs = []notify.PR{prResult}
+			continue
 		}
-		summary.StopReason = stopReason(statePath, *pickedPR, started)
+		summary.PRs = append(summary.PRs, prResult)
+	}
+	if len(pickedPRs) > 0 {
+		summary.StopReason = stopReason(statePath, pickedPRs[len(pickedPRs)-1], started)
 	}
 	if startUsage.Known {
 		usageJSON, _ := claude.Usage(ctx)
