@@ -2,7 +2,7 @@
 
 [English](README.md) | [한국어](README-ko.md) | 日本語
 
-計画ファイルの PR を一つ選び、夜のあいだに Claude Code でコミットを一つずつ実装して、朝に人がマージする PR を開く。
+夜のあいだに Claude Code で計画ファイルを上から、コミットを一つずつ、PR を一つずつ実装し、朝に人がマージする PR を stack にして残す。
 
 ## インストール
 
@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/foreverfl/nightcap/main/install.sh 
 ## 使い方
 
 ```sh
-nightcap run ~/work/todolist/blog-v2/commit-bot.md     # コミットが残っている一番上の PR の、次のコミットを実行する
+nightcap run ~/work/todolist/blog-v2/commit-bot.md     # 残っているコミットを PR の順にすべて実行する。終わるか、コミットが失敗するか、使用量が上限に達すると止まる
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # 計画のリポジトリとその worktree を表示する
 nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # 夜の実行で使えないものを表示する
 nightcap init                                          # 設定の例を ~/.config/nightcap/nightcap.yml に書く

@@ -26,7 +26,7 @@ import (
 	"nightcap/internal/verdict"
 )
 
-// Run takes the top PR of the plan file args[0] that has a commit to run, and runs its open commits one after another in a worktree of the frontmatter's repo, stopping at the first that is not accepted.
+// Run goes down the plan file args[0] PR by PR, running every open commit in a worktree of the frontmatter's repo, until nothing is left or a commit is not accepted.
 // It fails when no plan file is named or the frontmatter leaves a key out, and when the config, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
