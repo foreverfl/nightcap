@@ -82,9 +82,16 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		appendEvent(runPath, events.Event{Kind: "run_end", At: time.Now(), Reason: reason})
 	}()
 
+	pickedPR, _, err = runNextPR(ctx, stdout, loaded, meta, planPath, string(planText), statePath, worktreesDir, runPath, &startUsage)
+	return err
+}
+
+// runNextPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
+// picked is that PR, nil when there was none; finished is true when every commit of it ended accepted.
+func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, planPath, planText, statePath, worktreesDir, runPath string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
 	saved, err := state.Load(statePath)
 	if err != nil {
-		return err
+		return picked, false, err
 	}
 	var notBlocked []plan.PR
 	hasPR := map[string]bool{}
@@ -92,7 +99,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	previousOpenBranch := ""
 	stackOnto := map[string]string{}
 	previousOpenURL := ""
-	for _, planPR := range plan.Parse(string(planText)) {
+	for _, planPR := range plan.Parse(planText) {
 		baseFor[planPR.Slug] = "main"
 		if previousOpenBranch != "" {
 			baseFor[planPR.Slug] = previousOpenBranch
@@ -107,14 +114,14 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		if len(planPR.Commits) > 0 {
 			view, err := pr.ViewBranch(meta.Repo, planPR.Type+"/"+planPR.Slug)
 			if err != nil {
-				return err
+				return picked, false, err
 			}
 			if err := state.SavePRStatus(statePath, planPR.Slug, view.URL, view.State); err != nil {
-				return err
+				return picked, false, err
 			}
 			if view.State == "MERGED" || view.State == "CLOSED" {
 				if err := removeWorktreeIfAny(stdout, meta.Repo, filepath.Join(worktreesDir, planPR.Slug), planPR.Slug, view.State); err != nil {
-					return err
+					return picked, false, err
 				}
 				fmt.Fprintf(stdout, "skip %s: PR %s\n", planPR.Title, strings.ToLower(view.State))
 				continue
@@ -133,14 +140,14 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	planPR, ok := plan.Pick(notBlocked)
 	if !ok {
 		fmt.Fprintf(stdout, "%s: nothing to take\n", planPath)
-		return nil
+		return nil, false, nil
 	}
-	pickedPR = &planPR
+	picked = &planPR
 	base := baseFor[planPR.Slug]
 	branch := planPR.Type + "/" + planPR.Slug
 	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, filepath.Join(worktreesDir, planPR.Slug))
 	if err != nil {
-		return err
+		return picked, false, err
 	}
 	fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", planPath, branch, worktreeDir)
 	for _, commit := range planPR.Commits {
@@ -162,31 +169,31 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		usageJSON, _ := claude.Usage(ctx)
 		current, _ := usage.Read(usageJSON)
 		if !startUsage.Known {
-			startUsage = current
+			*startUsage = current
 		}
 		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
 			fmt.Fprintf(stdout, "  stop: %s\n", reason)
-			return state.SaveCommit(statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
+			return picked, false, state.SaveCommit(statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
 		if err := runCommit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, commit, statePath, runPath); err != nil {
-			return err
+			return picked, false, err
 		}
 		accepted, err := isAccepted(statePath, planPR.Slug, commit.Title)
 		if err != nil {
-			return err
+			return picked, false, err
 		}
 		if !accepted {
-			return nil // red, blocked or stopped: the commits below stand on this one
+			return picked, false, nil // red, blocked or stopped: the commits below stand on this one
 		}
 		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
-			return err
+			return picked, false, err
 		}
 		hasPR[planPR.Slug] = true
 		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, planPR); err != nil {
-			return err
+			return picked, false, err
 		}
 	}
-	return nil
+	return picked, true, nil
 }
 
 // isAccepted reports whether commitTitle ended green or read-code in the state file.
