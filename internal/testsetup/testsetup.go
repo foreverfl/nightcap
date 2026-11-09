@@ -47,7 +47,7 @@ func WritePlan(t *testing.T, repo, test string) {
 		"dependencies: [go.mod, go.sum]",
 		"---",
 		"",
-		"## 📄 feat: feed (feed)",
+		"## 📄 feat: first (first)",
 		"",
 		"- [ ] add it",
 		"  - DONE  go test passes",

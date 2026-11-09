@@ -22,14 +22,14 @@ func TestRunPrintsPickedPR(t *testing.T) {
 	}
 	want := strings.Join([]string{
 		"commit-bot.md",
-		"  branch: feat/feed",
-		"  worktree: " + filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees/feed"),
+		"  branch: feat/first",
+		"  worktree: " + filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees/first"),
 		"  take  add it",
-		"  ran  add it: done (log: " + filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round1.log") + ")",
+		"  ran  add it: done (log: " + filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/commit1-round1.log") + ")",
 		"  test: green",
 		"  added lines: 0",
 		"  verdict: green",
-		"  PR: https://github.com/foreverfl/feed/pull/1",
+		"  PR: https://github.com/foreverfl/first/pull/1",
 		"  label: nightcap:read-pr",
 	}, "\n") + "\n"
 	if stdout.String() != want {
@@ -49,7 +49,7 @@ func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("max_rounds 2 should leave 2 round logs, got %d: %v", len(logs), logs)
 	}
@@ -80,7 +80,7 @@ func TestRunMarksCommitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("`false` fails the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -105,7 +105,7 @@ func TestRunMarksCommitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/*.log"))
 	if len(logs) != 2 {
 		t.Fatalf("go.sum turns the verdict red the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -126,10 +126,10 @@ func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// a second PR below feed, which must wait while feed is blocked
+	// a second PR below first, which must wait while first is blocked
 	secondPR := strings.Join([]string{
 		"",
-		"## 📄 feat: feed page (feed-page)",
+		"## 📄 feat: second (second)",
 		"",
 		"- [ ] show it",
 		"  - DONE  go test passes",
@@ -146,7 +146,7 @@ func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
 		t.Fatalf("second run: %v", err)
 	}
 	want := strings.Join([]string{
-		"stop feed: blocked, the PRs below wait",
+		"stop first: blocked, the PRs below wait",
 		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if secondStdout.String() != want {
@@ -156,13 +156,13 @@ func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
 
 func TestRunSkipsAPRThatWasMerged(t *testing.T) {
 	testsetup.SetUpRepoWithOneCommitPlan(t)
-	testsetup.UseFakeGh(t, map[string]string{"feat/feed": "MERGED"})
+	testsetup.UseFakeGh(t, map[string]string{"feat/first": "MERGED"})
 	var stdout bytes.Buffer
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	want := strings.Join([]string{
-		"skip feed: PR merged",
+		"skip first: PR merged",
 		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if stdout.String() != want {
@@ -207,11 +207,11 @@ func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 		"dependencies: []",
 		"---",
 		"",
-		"## 📄 feat: feed (feed)",
+		"## 📄 feat: first (first)",
 		"",
 		"- [ ] add it",
 		"",
-		"## 📄 feat: feed page (feed-page)",
+		"## 📄 feat: second (second)",
 		"",
 		"- [ ] show it",
 		"  - DONE  go test passes",
@@ -219,10 +219,10 @@ func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 	if err := os.WriteFile("commit-bot.md", planText, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if output, err := exec.Command("git", "-C", repo, "branch", "feat/feed").CombinedOutput(); err != nil {
+	if output, err := exec.Command("git", "-C", repo, "branch", "feat/first").CombinedOutput(); err != nil {
 		t.Fatalf("git branch: %v\n%s", err, output)
 	}
-	ghCallsPath := testsetup.UseFakeGh(t, map[string]string{"feat/feed": "OPEN"})
+	ghCallsPath := testsetup.UseFakeGh(t, map[string]string{"feat/first": "OPEN"})
 	var stdout bytes.Buffer
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
@@ -232,8 +232,8 @@ func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	createIndex := strings.Index(string(ghCalls), "pr create ")
-	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --base feat/feed ") {
-		t.Fatalf("the PR should be opened onto feat/feed, got gh calls:\n%s", ghCalls)
+	if createIndex < 0 || !strings.HasPrefix(string(ghCalls[createIndex:]), "pr create --base feat/first ") {
+		t.Fatalf("the PR should be opened onto feat/first, got gh calls:\n%s", ghCalls)
 	}
 }
 
@@ -251,8 +251,8 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	first, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round1.log"))
-	second, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/feed/commit1-round2.log"))
+	first, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/commit1-round1.log"))
+	second, _ := os.ReadFile(filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/commit1-round2.log"))
 	if strings.Contains(string(first), "--resume") || !strings.Contains(string(second), "--resume s1") {
 		t.Fatalf("round 1 should start a session and round 2 resume s1\nround 1: %s\nround 2: %s", first, second)
 	}
@@ -266,7 +266,7 @@ func TestRunRunsEveryOpenCommitOfThePR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// a second commit under feed, which the same run must take after the first
+	// a second commit under first, which the same run must take after the first
 	secondCommit := strings.Join([]string{
 		"",
 		"- [ ] show it",
@@ -287,7 +287,7 @@ func TestRunRunsEveryOpenCommitOfThePR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	creates, edits := strings.Count(string(calls), "pr create "), strings.Count(string(calls), "pr edit feat/feed --body-file")
+	creates, edits := strings.Count(string(calls), "pr create "), strings.Count(string(calls), "pr edit feat/first --body-file")
 	if creates != 1 || edits != 1 {
 		t.Fatalf("the second commit should edit the PR, not open another: %d create, %d edit\n%s", creates, edits, calls)
 	}
@@ -309,20 +309,20 @@ func TestRunDoesNotRunACommitThatIsAlreadyGreen(t *testing.T) {
 }
 
 func TestRunSkipsAPRWhoseCommitsAreAllGreen(t *testing.T) {
-	testsetup.SetUpRepoWithOneCommitPlan(t) // PR feed with one commit
+	testsetup.SetUpRepoWithOneCommitPlan(t) // PR first with one commit
 	testsetup.UseFakeClaude(t)
-	testsetup.AppendToPlan(t, "## 📄 feat: feed page (feed-page)", "", "- [ ] show it", "  - DONE  go test passes")
+	testsetup.AppendToPlan(t, "## 📄 feat: second (second)", "", "- [ ] show it", "  - DONE  go test passes")
 
-	if err := Run([]string{"commit-bot.md"}, io.Discard); err != nil { // finishes feed and opens its PR
+	if err := Run([]string{"commit-bot.md"}, io.Discard); err != nil { // finishes first and opens its PR
 		t.Fatal(err)
 	}
-	ghCalls := testsetup.UseFakeGh(t, map[string]string{"feat/feed": "OPEN"})
-	if err := Run([]string{"commit-bot.md"}, io.Discard); err != nil { // must skip feed and take feed-page
+	ghCalls := testsetup.UseFakeGh(t, map[string]string{"feat/first": "OPEN"})
+	if err := Run([]string{"commit-bot.md"}, io.Discard); err != nil { // must skip first and take second
 		t.Fatal(err)
 	}
 
 	calls, _ := os.ReadFile(ghCalls)
-	if !strings.Contains(string(calls), "pr create --base feat/feed --title feat: feed page ") {
-		t.Fatalf("the second run should open feed-page on top of feed\n%s", calls)
+	if !strings.Contains(string(calls), "pr create --base feat/first --title feat: second ") {
+		t.Fatalf("the second run should open second on top of first\n%s", calls)
 	}
 }
