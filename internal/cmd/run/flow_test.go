@@ -291,3 +291,18 @@ func TestRunRunsEveryOpenCommitOfThePR(t *testing.T) {
 		t.Fatalf("the second commit should edit the PR, not open another: %d create, %d edit\n%s", creates, edits, calls)
 	}
 }
+
+func TestRunDoesNotRunACommitThatIsAlreadyGreen(t *testing.T) {
+	testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	var firstStdout, secondStdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &firstStdout); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	if err := Run([]string{"commit-bot.md"}, &secondStdout); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	if strings.Contains(secondStdout.String(), "  ran  ") {
+		t.Fatalf("the second run should skip the commit the first one finished, got %q", secondStdout.String())
+	}
+}

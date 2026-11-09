@@ -152,6 +152,9 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		if !commit.HasTest {
 			continue
 		}
+		if done, _ := isAccepted(statePath, planPR.Slug, commit.Title); done {
+			continue // done in an earlier run; the plan still shows it as [ ]
+		}
 		// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
 		usageJSON, _ := claude.Usage(ctx)
 		current, _ := usage.Read(usageJSON)
