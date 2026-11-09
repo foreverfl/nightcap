@@ -2,6 +2,7 @@ package run
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -304,5 +305,24 @@ func TestRunDoesNotRunACommitThatIsAlreadyGreen(t *testing.T) {
 	}
 	if strings.Contains(secondStdout.String(), "  ran  ") {
 		t.Fatalf("the second run should skip the commit the first one finished, got %q", secondStdout.String())
+	}
+}
+
+func TestRunSkipsAPRWhoseCommitsAreAllGreen(t *testing.T) {
+	testsetup.SetUpRepoWithOneCommitPlan(t) // PR feed with one commit
+	testsetup.UseFakeClaude(t)
+	testsetup.AppendToPlan(t, "## 📄 feat: feed page (feed-page)", "", "- [ ] show it", "  - DONE  go test passes")
+
+	if err := Run([]string{"commit-bot.md"}, io.Discard); err != nil { // finishes feed and opens its PR
+		t.Fatal(err)
+	}
+	ghCalls := testsetup.UseFakeGh(t, map[string]string{"feat/feed": "OPEN"})
+	if err := Run([]string{"commit-bot.md"}, io.Discard); err != nil { // must skip feed and take feed-page
+		t.Fatal(err)
+	}
+
+	calls, _ := os.ReadFile(ghCalls)
+	if !strings.Contains(string(calls), "pr create --base feat/feed --title feat: feed page ") {
+		t.Fatalf("the second run should open feed-page on top of feed\n%s", calls)
 	}
 }

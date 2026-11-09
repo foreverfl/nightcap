@@ -125,6 +125,9 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 				previousOpenURL = view.URL
 			}
 		}
+		if isPRDone(saved.PRs[planPR.Slug], planPR) {
+			continue // its branch above still becomes the base of the PR below
+		}
 		notBlocked = append(notBlocked, planPR)
 	}
 	planPR, ok := plan.Pick(notBlocked)
@@ -194,6 +197,17 @@ func isAccepted(statePath, slug, commitTitle string) (bool, error) {
 	}
 	result := saved.PRs[slug].Commits[commitTitle].Result
 	return result == "green" || result == "read-code", nil
+}
+
+// isPRDone reports whether every commit of planPR that has a check ended green or read-code.
+func isPRDone(savedPR state.PR, planPR plan.PR) bool {
+	for _, commit := range planPR.Commits {
+		result := savedPR.Commits[commit.Title].Result
+		if commit.HasTest && result != "green" && result != "read-code" {
+			return false
+		}
+	}
+	return true
 }
 
 // runCommit runs claude and the test on one commit until the test is green or MaxRounds is spent.

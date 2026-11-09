@@ -150,3 +150,16 @@ func RunCacheDir(t *testing.T, repo string) string {
 	}
 	return dir
 }
+
+// AppendToPlan adds lines to the end of commit-bot.md, one per line, after a blank line.
+func AppendToPlan(t *testing.T, lines ...string) {
+	t.Helper()
+	planFile, err := os.OpenFile("commit-bot.md", os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer planFile.Close()
+	if _, err := planFile.WriteString("\n" + strings.Join(lines, "\n") + "\n"); err != nil {
+		t.Fatal(err)
+	}
+}
