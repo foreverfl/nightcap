@@ -2,7 +2,6 @@ package run
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,6 +30,7 @@ func TestRunPrintsPickedPR(t *testing.T) {
 		"  verdict: green",
 		"  PR: https://github.com/foreverfl/first/pull/1",
 		"  label: nightcap:read-pr",
+		"commit-bot.md: nothing to take",
 	}, "\n") + "\n"
 	if stdout.String() != want {
 		t.Fatalf("stdout = %q", stdout.String())
@@ -308,21 +308,24 @@ func TestRunDoesNotRunACommitThatIsAlreadyGreen(t *testing.T) {
 	}
 }
 
-func TestRunSkipsAPRWhoseCommitsAreAllGreen(t *testing.T) {
+func TestRunTakesThePRBelowOnceThePRAboveIsDone(t *testing.T) {
 	testsetup.SetUpRepoWithOneCommitPlan(t) // PR first with one commit
 	testsetup.UseFakeClaude(t)
+	ghCalls := testsetup.UseFakeGh(t, nil)
 	testsetup.AppendToPlan(t, "## 📄 feat: second (second)", "", "- [ ] show it", "  - DONE  go test passes")
 
-	if err := Run([]string{"commit-bot.md"}, io.Discard); err != nil { // finishes first and opens its PR
-		t.Fatal(err)
-	}
-	ghCalls := testsetup.UseFakeGh(t, map[string]string{"feat/first": "OPEN"})
-	if err := Run([]string{"commit-bot.md"}, io.Discard); err != nil { // must skip first and take second
+	var stdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil { // one run: first, then second
 		t.Fatal(err)
 	}
 
 	calls, _ := os.ReadFile(ghCalls)
-	if !strings.Contains(string(calls), "pr create --base feat/first --title feat: second ") {
-		t.Fatalf("the second run should open second on top of first\n%s", calls)
+	for _, want := range []string{"pr create --base main --title feat: first ", "pr create --base feat/first --title feat: second "} {
+		if !strings.Contains(string(calls), want) {
+			t.Fatalf("gh calls should contain %q\n%s", want, calls)
+		}
+	}
+	if !strings.HasSuffix(stdout.String(), "commit-bot.md: nothing to take\n") {
+		t.Fatalf("the run should go on until nothing is left, got %q", stdout.String())
 	}
 }

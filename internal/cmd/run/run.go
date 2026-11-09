@@ -67,23 +67,31 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		return err
 	}
 	worktreesDir := filepath.Join(cacheDir, "worktrees")
-	var pickedPR *plan.PR // the PR tonight took; nil when there was none
+	var pickedPRs []plan.PR // the PRs tonight took, top to bottom
 	// one file per run, under its start date: ~/.local/share/nightcap/blog-v2/runs/261108/225500.jsonl
 	runPath := filepath.Join(dataDir, "runs", started.Format("060102"), started.Format("150405")+".jsonl")
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
-		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPR, started, startUsage)
+		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPRs, started, startUsage)
 		reason := ""
 		if runErr != nil {
 			reason = runErr.Error()
-		} else if pickedPR != nil {
-			reason = stopReason(statePath, *pickedPR, started)
+		} else if len(pickedPRs) > 0 {
+			reason = stopReason(statePath, pickedPRs[len(pickedPRs)-1], started)
 		}
 		appendEvent(runPath, events.Event{Kind: "run_end", At: time.Now(), Reason: reason})
 	}()
 
-	pickedPR, _, err = runNextPR(ctx, stdout, loaded, meta, planPath, string(planText), statePath, worktreesDir, runPath, &startUsage)
-	return err
+	// a PR whose commits all ended accepted lets the next pass take the PR below it
+	for {
+		picked, finished, err := runNextPR(ctx, stdout, loaded, meta, planPath, string(planText), statePath, worktreesDir, runPath, &startUsage)
+		if picked != nil {
+			pickedPRs = append(pickedPRs, *picked)
+		}
+		if err != nil || !finished {
+			return err
+		}
+	}
 }
 
 // runNextPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
@@ -469,16 +477,18 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 }
 
 // sendNightSummary sends the morning message; a failed send only prints to stderr, so it never changes the run's result.
-func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedPR *plan.PR, started time.Time, startUsage usage.Usage) {
+func sendNightSummary(ctx context.Context, loaded config.Config, repo, statePath string, pickedPRs []plan.PR, started time.Time, startUsage usage.Usage) {
 	summary := notify.Summary{Repos: []string{filepath.Base(repo)}, Start: started, End: time.Now()}
-	if pickedPR != nil {
-		prResult, err := prSummary(statePath, *pickedPR)
+	for _, pickedPR := range pickedPRs {
+		prResult, err := prSummary(statePath, pickedPR)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "notify:", err)
-		} else {
-			summary.PRs = []notify.PR{prResult}
+			continue
 		}
-		summary.StopReason = stopReason(statePath, *pickedPR, started)
+		summary.PRs = append(summary.PRs, prResult)
+	}
+	if len(pickedPRs) > 0 {
+		summary.StopReason = stopReason(statePath, pickedPRs[len(pickedPRs)-1], started)
 	}
 	if startUsage.Known {
 		usageJSON, _ := claude.Usage(ctx)
