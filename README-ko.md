@@ -54,6 +54,13 @@ HTTP로 메모를 보고 더할 수 있게 해서, 웹 화면이 부를 곳을 �
   - DONE  go test ./internal/note 통과
 ```
 
+`protected`와 `dependencies` 패턴이 파일을 맞추는 방법:
+
+- `/`가 없으면: 어느 폴더에 있든 파일 이름만. `*_test.go`는 `internal/feed/feed_test.go`를 잡는다
+- `/`가 있으면: 레포 루트부터 경로 전체
+- `*`: 폴더 하나. `services/*/Cargo.toml`은 `services/rust/Cargo.toml`을 잡고 `services/rust/src/main.rs`는 안 잡는다
+- `**`: 폴더 몇 개든. `services/**/*_test.go`는 `services/` 밑 어느 깊이의 테스트 파일이든 잡는다
+
 ### nightcap.yml
 
 `nightcap init`이 [examples/nightcap.yml](examples/nightcap.yml)을 `~/.config/nightcap/nightcap.yml`에 쓰고, `nightcap config`가 그 파일을 연다. 이 기계에서 모든 계획이 같이 쓰는 설정만 둔다.
