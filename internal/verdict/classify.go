@@ -86,12 +86,11 @@ func isInsideWhere(filePath string, wherePaths []string) bool {
 	return false
 }
 
-// matchesAny reports whether filePath matches one of patterns; a pattern without "/" matches the file name, "dir/*" anything under dir.
+// matchesAny reports whether filePath matches one of patterns; a pattern without "/" matches the file name, one with "/" the whole path folder by folder.
 func matchesAny(filePath string, patterns []string) bool {
 	for _, pattern := range patterns {
-		folder, _, hasFolder := strings.Cut(pattern, "/")
-		if hasFolder {
-			if strings.HasPrefix(filePath, folder+"/") || strings.Contains(filePath, "/"+folder+"/") {
+		if strings.Contains(pattern, "/") {
+			if isWholePathMatch(strings.Split(pattern, "/"), strings.Split(filePath, "/")) {
 				return true
 			}
 			continue
@@ -101,6 +100,28 @@ func matchesAny(filePath string, patterns []string) bool {
 		}
 	}
 	return false
+}
+
+// isWholePathMatch reports whether pathFolders match patternFolders one folder at a time, where "**" stands for any number of folders.
+func isWholePathMatch(patternFolders, pathFolders []string) bool {
+	if len(patternFolders) == 0 {
+		return len(pathFolders) == 0
+	}
+	// "**" first: drop it and try the rest against the path with 0, 1, 2… folders skipped.
+	if patternFolders[0] == "**" {
+		for skipped := 0; skipped <= len(pathFolders); skipped++ {
+			if isWholePathMatch(patternFolders[1:], pathFolders[skipped:]) {
+				return true
+			}
+		}
+		return false
+	}
+	if len(pathFolders) == 0 {
+		return false
+	}
+	// Anything else: compare the first folders, then drop one from each and compare the rest.
+	matched, _ := path.Match(patternFolders[0], pathFolders[0])
+	return matched && isWholePathMatch(patternFolders[1:], pathFolders[1:])
 }
 
 // hasSkipMarker reports whether line contains one of skipMarkers or starts with one of skipCallsAtLineStart.

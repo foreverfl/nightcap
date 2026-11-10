@@ -79,3 +79,31 @@ func TestClassifyRegeneratedOpenapiIsNotRedWhenOnlyTspIsProtected(t *testing.T) 
 		t.Fatalf("openapi.yaml is generated and should not be red, got %+v", verdict)
 	}
 }
+
+func TestClassifySourceFileUnderStarFolderIsNotRed(t *testing.T) {
+	verdict := Classify([]git.Change{{Status: "M", Path: "services/rust/src/github/handler.rs"}}, nil, []string{"services/rust/src/github/handler.rs"}, nil, []string{"services/*/Cargo.toml"})
+	if verdict != (Result{}) {
+		t.Fatalf("handler.rs is not services/*/Cargo.toml and should give an empty Result, got %+v", verdict)
+	}
+}
+
+func TestClassifyCargoTomlUnderStarFolderIsRed(t *testing.T) {
+	verdict := Classify([]git.Change{{Status: "M", Path: "services/rust/Cargo.toml"}}, nil, nil, nil, []string{"services/*/Cargo.toml"})
+	if verdict != (Result{Red: true, Reason: "changed a dependency file: services/rust/Cargo.toml"}) {
+		t.Fatalf("services/rust/Cargo.toml should be red, got %+v", verdict)
+	}
+}
+
+func TestClassifyTestFileUnderDoubleStarIsRed(t *testing.T) {
+	verdict := Classify([]git.Change{{Status: "M", Path: "services/rust/src/github/handler_test.go"}}, nil, nil, []string{"services/**/*_test.go"}, nil)
+	if verdict != (Result{Red: true, Reason: "edited a contract file: services/rust/src/github/handler_test.go"}) {
+		t.Fatalf("a test file deep under services/** should be red, got %+v", verdict)
+	}
+}
+
+func TestClassifySpecUnderTrailingDoubleStarIsRed(t *testing.T) {
+	verdict := Classify([]git.Change{{Status: "M", Path: "doc-source/openapi/specs/a/b.tsp"}}, nil, nil, []string{"doc-source/openapi/specs/**"}, nil)
+	if verdict != (Result{Red: true, Reason: "edited a contract file: doc-source/openapi/specs/a/b.tsp"}) {
+		t.Fatalf("a file deep under specs/** should be red, got %+v", verdict)
+	}
+}

@@ -54,6 +54,13 @@ Notes can be listed and added over HTTP, so the web page has something to call.
   - DONE  go test ./internal/note passes
 ```
 
+How a `protected` or `dependencies` pattern matches a file:
+
+- Without `/`: the file name in any folder. `*_test.go` catches `internal/feed/feed_test.go`
+- With `/`: the whole path from the repo root
+- `*`: one folder. `services/*/Cargo.toml` catches `services/rust/Cargo.toml`, not `services/rust/src/main.rs`
+- `**`: any number of folders. `services/**/*_test.go` catches a test file at any depth under `services/`
+
 ### nightcap.yml
 
 `nightcap init` writes [examples/nightcap.yml](examples/nightcap.yml) to `~/.config/nightcap/nightcap.yml`, and `nightcap config` opens it. It holds the settings every plan shares on this machine.
