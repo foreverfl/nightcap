@@ -21,6 +21,7 @@ nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # 밤 실행이 쓸 수 �
 nightcap clean                                         # nightcap이 ~/.cache/nightcap에 남긴 워크트리를 전부 지운다
 nightcap init                                          # 예시 설정을 ~/.config/nightcap/nightcap.yml에 쓴다
 nightcap config                                        # 그 파일을 $VISUAL이나 $EDITOR로 연다
+nightcap update                                        # install.sh와 같은 방법으로 ~/.local/bin/nightcap을 최신 릴리스로 바꾼다
 nightcap version
 ```
 

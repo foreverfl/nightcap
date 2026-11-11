@@ -21,6 +21,7 @@ nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # prints what a night run
 nightcap clean                                         # removes every worktree nightcap left under ~/.cache/nightcap
 nightcap init                                          # writes the example config to ~/.config/nightcap/nightcap.yml
 nightcap config                                        # opens that file in $VISUAL or $EDITOR
+nightcap update                                        # replaces ~/.local/bin/nightcap with the latest release, the same way install.sh does
 nightcap version
 ```
 
