@@ -433,7 +433,14 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if hasPR {
 		return pr.EditBody(worktreeDir, appToken, branch, body)
 	}
-	prURL, err := pr.Create(worktreeDir, appToken, base, planPR.Type+": "+planPR.Title, body)
+	title := planPR.Title
+	if slices.Contains(loaded.Lang, "en") {
+		// a failed translation keeps the Korean title, so a title never stops the night
+		if english, err := claude.TranslateTitle(ctx, planPR.Title); err == nil && english != "" {
+			title = english
+		}
+	}
+	prURL, err := pr.Create(worktreeDir, appToken, base, planPR.Type+": "+title, body)
 	if err != nil {
 		return err
 	}
