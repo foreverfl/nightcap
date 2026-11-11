@@ -2,6 +2,7 @@ package git
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -25,6 +26,15 @@ func AddWorktree(repo, base, branch, worktreeDir string) (string, error) {
 func RemoveWorktree(repo, worktreeDir string) error {
 	_, err := runGit(repo, "worktree", "remove", "--force", worktreeDir)
 	return err
+}
+
+// RepoOf returns the main repo folder that the worktree at worktreeDir belongs to.
+func RepoOf(worktreeDir string) (string, error) {
+	commonGitDir, err := runGit(worktreeDir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Dir(strings.TrimSpace(commonGitDir)), nil
 }
 
 // ListWorktrees returns one line per worktree of repo, as `git worktree list` prints them.

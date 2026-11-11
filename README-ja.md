@@ -18,6 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/foreverfl/nightcap/main/install.sh 
 nightcap run ~/work/todolist/blog-v2/commit-bot.md     # 残っているコミットを PR の順にすべて実行する。終わるか、コミットが失敗するか、使用量が上限に達すると止まる
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # 計画のリポジトリとその worktree を表示する
 nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # 夜の実行で使えないものを表示する
+nightcap clean                                         # nightcap が ~/.cache/nightcap に残した worktree をすべて削除する
 nightcap init                                          # 設定の例を ~/.config/nightcap/nightcap.yml に書く
 nightcap config                                        # そのファイルを $VISUAL か $EDITOR で開く
 nightcap version
