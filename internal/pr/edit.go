@@ -6,7 +6,7 @@ func editArgs(branch, bodyPath string) []string {
 }
 
 // EditBody replaces the body of the PR whose head is branch.
-func EditBody(worktreeDir, branch, body string) error {
-	_, err := runGhWithBody(worktreeDir, "", body, func(bodyPath string) []string { return editArgs(branch, bodyPath) })
+func EditBody(worktreeDir, appToken, branch, body string) error {
+	_, err := runGhWithBody(worktreeDir, appToken, body, func(bodyPath string) []string { return editArgs(branch, bodyPath) })
 	return err
 }

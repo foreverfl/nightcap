@@ -208,7 +208,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 			return picked, false, err
 		}
 		hasPR[planPR.Slug] = true
-		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, planPR); err != nil {
+		if err := labelWhenFinished(ctx, stdout, statePath, worktreeDir, planPR, loaded); err != nil {
 			return picked, false, err
 		}
 	}
@@ -426,12 +426,12 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if err != nil {
 		return err
 	}
-	if hasPR {
-		return pr.EditBody(worktreeDir, branch, body)
-	}
 	appToken, err := appToken(ctx, loaded, worktreeDir)
 	if err != nil {
 		return err
+	}
+	if hasPR {
+		return pr.EditBody(worktreeDir, appToken, branch, body)
 	}
 	prURL, err := pr.Create(worktreeDir, appToken, base, planPR.Type+": "+planPR.Title, body)
 	if err != nil {
@@ -440,7 +440,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	indent.Fprintf(stdout, 1, "PR: %s\n", prURL)
 	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: commitTitle, URL: prURL})
 	if previousURL != "" {
-		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
+		if err := pr.LinkStack(worktreeDir, appToken, previousURL, prURL); err != nil {
 			return err
 		}
 	}
@@ -486,7 +486,7 @@ func bodyInput(planPR plan.PR, savedPR state.PR, lastCommitTitle string) pr.Body
 }
 
 // labelWhenFinished adds, once every commit is done, the label the PR's mark names, and turns on auto-merge for 🤖.
-func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, planPR plan.PR) error {
+func labelWhenFinished(ctx context.Context, stdout io.Writer, statePath, worktreeDir string, planPR plan.PR, loaded config.Config) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -499,12 +499,16 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	}
 	branch := planPR.Type + "/" + planPR.Slug
 	label := pr.ReadingLabel(planPR.Mark)
-	if err := pr.AddLabel(worktreeDir, branch, label); err != nil {
+	appToken, err := appToken(ctx, loaded, worktreeDir)
+	if err != nil {
+		return err
+	}
+	if err := pr.AddLabel(worktreeDir, appToken, branch, label); err != nil {
 		return err
 	}
 	indent.Fprintf(stdout, 1, "label: %s\n", label)
 	if planPR.Mark == plan.MarkAuto {
-		if err := pr.EnableAutoMerge(worktreeDir, branch, mergeMethod); err != nil {
+		if err := pr.EnableAutoMerge(worktreeDir, appToken, branch, loaded.MergeMethod); err != nil {
 			return err
 		}
 		indent.Fprintf(stdout, 1, "auto-merge: %s\n", branch)

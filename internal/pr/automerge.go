@@ -10,7 +10,7 @@ func autoMergeArgs(branch, method string) []string {
 }
 
 // EnableAutoMerge lets GitHub merge the PR whose head is branch once its required checks pass.
-func EnableAutoMerge(worktreeDir, branch, method string) error {
-	_, err := runGh(worktreeDir, autoMergeArgs(branch, method)...)
+func EnableAutoMerge(worktreeDir, appToken, branch, method string) error {
+	_, err := runGhAs(worktreeDir, appToken, autoMergeArgs(branch, method)...)
 	return err
 }
