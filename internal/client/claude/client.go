@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"nightcap/internal/indent"
 )
 
 // RunRound runs one `claude -p` round in worktreeDir, appending each output line to logPath and what claude does to screen as it comes; a non-empty sessionID resumes that conversation.
@@ -75,7 +77,7 @@ func copyLinesToLogAndScreen(claudeOutput io.Reader, logFile, screen io.Writer, 
 			return nil, err
 		}
 		for _, screenLine := range ScreenLines(scanner.Bytes(), worktreeDir) {
-			fmt.Fprintln(screen, "    "+screenLine)
+			indent.Fprintf(screen, 2, "%s\n", screenLine)
 		}
 		lastLine = bytes.Clone(scanner.Bytes())
 	}
