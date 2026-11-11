@@ -21,8 +21,10 @@ fi
 
 bin_dir="$HOME/.local/bin"
 mkdir -p "$bin_dir"
-curl -fsSL "$url" -o "$bin_dir/nightcap"
-chmod +x "$bin_dir/nightcap"
+curl -fsSL "$url" -o "$bin_dir/nightcap.new"
+chmod +x "$bin_dir/nightcap.new"
+# macOS kills a binary overwritten in place while it runs; a rename leaves the running one intact.
+mv -f "$bin_dir/nightcap.new" "$bin_dir/nightcap"
 echo "installed $("$bin_dir/nightcap" version) to ~/.local/bin"
 
 # Add ~/.local/bin to PATH in the shell rc, unless PATH already has it.

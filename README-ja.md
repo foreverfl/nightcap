@@ -21,6 +21,7 @@ nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # 夜の実行で使え�
 nightcap clean                                         # nightcap が ~/.cache/nightcap に残した worktree をすべて削除する
 nightcap init                                          # 設定の例を ~/.config/nightcap/nightcap.yml に書く
 nightcap config                                        # そのファイルを $VISUAL か $EDITOR で開く
+nightcap update                                        # install.sh と同じ方法で ~/.local/bin/nightcap を最新リリースに置き換える
 nightcap version
 ```
 
