@@ -118,16 +118,16 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	hasPR := map[string]bool{}
 	baseFor := map[string]string{}
 	previousOpenBranch := ""
-	stackOnto := map[string]string{}
-	previousOpenURL := ""
+	stackBelow := map[string][]string{} // the open PRs a new PR stacks onto, bottom first
+	var openStack []string              // the open PRs right above in the plan, unbroken, bottom first
 	for _, planPR := range plan.Parse(planText) {
 		baseFor[planPR.Slug] = "main"
 		if previousOpenBranch != "" {
 			baseFor[planPR.Slug] = previousOpenBranch
 		}
-		stackOnto[planPR.Slug] = previousOpenURL
+		stackBelow[planPR.Slug] = openStack
 		previousOpenBranch = ""
-		previousOpenURL = ""
+		openStack = nil
 		if len(planPR.Commits) > 0 {
 			view, err := pr.ViewBranch(meta.Repo, planPR.Type+"/"+planPR.Slug)
 			if err != nil {
@@ -146,7 +146,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 			hasPR[planPR.Slug] = view.State == "OPEN"
 			if hasPR[planPR.Slug] {
 				previousOpenBranch = planPR.Type + "/" + planPR.Slug
-				previousOpenURL = view.URL
+				openStack = append(slices.Clone(stackBelow[planPR.Slug]), view.URL)
 			}
 		}
 		if isPRDone(saved.PRs[planPR.Slug], planPR) {
@@ -204,7 +204,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if !accepted {
 			return picked, false, nil // red, blocked or stopped: the commits below stand on this one
 		}
-		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], loaded); err != nil {
+		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackBelow[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], loaded); err != nil {
 			return picked, false, err
 		}
 		hasPR[planPR.Slug] = true
@@ -391,7 +391,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 }
 
 // openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR. The caller has checked that commitTitle was accepted.
-func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR bool, loaded config.Config) error {
+func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base string, stackBelow []string, planPR plan.PR, commitTitle string, hasPR bool, loaded config.Config) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -446,8 +446,8 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	}
 	indent.Fprintf(stdout, 1, "PR: %s\n", prURL)
 	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: commitTitle, URL: prURL})
-	if previousURL != "" {
-		if err := pr.LinkStack(worktreeDir, appToken, previousURL, prURL); err != nil {
+	if len(stackBelow) > 0 {
+		if err := pr.LinkStack(worktreeDir, appToken, append(stackBelow, prURL)); err != nil {
 			return err
 		}
 	}
