@@ -204,7 +204,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if !accepted {
 			return picked, false, nil // red, blocked or stopped: the commits below stand on this one
 		}
-		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
+		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], loaded); err != nil {
 			return picked, false, err
 		}
 		hasPR[planPR.Slug] = true
@@ -391,7 +391,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 }
 
 // openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR. The caller has checked that commitTitle was accepted.
-func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR, isEnglishWanted bool) error {
+func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR bool, loaded config.Config) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -417,7 +417,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	reviewOrder, reviewOrderErr := claude.ReviewOrder(ctx, diff)
 	input.ReviewOrder, input.IsMissingReviewOrder = reviewOrder, reviewOrderErr != nil
 	var body string
-	if isEnglishWanted {
+	if slices.Contains(loaded.Lang, "en") {
 		translate := func(korean string) (string, error) { return claude.Translate(ctx, korean) }
 		body, err = pr.BuildBilingualBody(input, translate)
 	} else {
@@ -429,7 +429,11 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if hasPR {
 		return pr.EditBody(worktreeDir, branch, body)
 	}
-	prURL, err := pr.Create(worktreeDir, "", base, planPR.Type+": "+planPR.Title, body)
+	appToken, err := appToken(ctx, loaded, worktreeDir)
+	if err != nil {
+		return err
+	}
+	prURL, err := pr.Create(worktreeDir, appToken, base, planPR.Type+": "+planPR.Title, body)
 	if err != nil {
 		return err
 	}
@@ -441,6 +445,27 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 		}
 	}
 	return state.SavePRStatus(statePath, planPR.Slug, prURL, "OPEN")
+}
+
+// appToken returns a fresh token for the App nightcap.yml names on the repo at repoDir, or "" when it names none.
+// It is asked right before each use because a token dies after an hour and a night runs longer.
+func appToken(ctx context.Context, loaded config.Config, repoDir string) (string, error) {
+	if loaded.AppID == 0 || loaded.AppKey == "" {
+		return "", nil
+	}
+	jwt, err := ghapp.JWT(loaded.AppID, loaded.AppKey)
+	if err != nil {
+		return "", fmt.Errorf("app: %w", err)
+	}
+	ownerRepo, err := pr.RepoName(repoDir)
+	if err != nil {
+		return "", err
+	}
+	token, err := ghapp.Token(ctx, jwt, ownerRepo)
+	if err != nil {
+		return "", fmt.Errorf("app: %w", err)
+	}
+	return token, nil
 }
 
 // bodyInput returns the PR body's values: planPR's summary and every commit that ended green or read-code.
