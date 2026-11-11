@@ -15,3 +15,11 @@ var translateInstructions = strings.Join([]string{
 func Translate(ctx context.Context, korean string) (string, error) {
 	return askOnce(ctx, "translate", translateInstructions+"\n\n"+korean)
 }
+
+var translateTitleInstructions = "Translate this PR title from Korean to English as one line like a commit subject, starting with a lowercase verb. Reply with the translation only."
+
+// TranslateTitle asks claude to turn the Korean PR title, without its type, into one English line, e.g. "show the day's real ranking on the first screen".
+func TranslateTitle(ctx context.Context, korean string) (string, error) {
+	english, err := askOnce(ctx, "translate title", translateTitleInstructions+"\n\n"+korean)
+	return strings.TrimSpace(english), err
+}
