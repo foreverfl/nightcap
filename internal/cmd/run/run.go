@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"nightcap/internal/client/claude"
+	"nightcap/internal/client/ghapp"
 	"nightcap/internal/config"
 	"nightcap/internal/events"
 	"nightcap/internal/git"
@@ -56,6 +57,17 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	if loaded.AppID != 0 && loaded.AppKey != "" {
+		jwt, err := ghapp.JWT(loaded.AppID, loaded.AppKey)
+		if err != nil {
+			return fmt.Errorf("app: %w", err)
+		}
+		appName, err := ghapp.AppName(ctx, jwt)
+		if err != nil {
+			return fmt.Errorf("app: %w", err)
+		}
+		fmt.Fprintf(stdout, "app: %s\n", appName)
+	}
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a commit, so a night that runs nothing never calls claude
 	dataDir, err := path.DataDir(meta.Repo)
@@ -192,11 +204,11 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if !accepted {
 			return picked, false, nil // red, blocked or stopped: the commits below stand on this one
 		}
-		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], slices.Contains(loaded.Lang, "en")); err != nil {
+		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackOnto[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], loaded); err != nil {
 			return picked, false, err
 		}
 		hasPR[planPR.Slug] = true
-		if err := labelWhenFinished(stdout, statePath, worktreeDir, loaded.MergeMethod, planPR); err != nil {
+		if err := labelWhenFinished(ctx, stdout, statePath, worktreeDir, planPR, loaded); err != nil {
 			return picked, false, err
 		}
 	}
@@ -235,7 +247,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		record.Attempts = round
 		logPath := filepath.Join(filepath.Dir(statePath), "logs", slug, fmt.Sprintf("commit%d-round%d.log", number, round))
 		roundStarted := time.Now()
-		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath, stdout)
+		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, loaded.AuthorName, loaded.AuthorEmail, logPath, stdout)
 		if err != nil {
 			return err
 		}
@@ -379,7 +391,7 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 }
 
 // openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR. The caller has checked that commitTitle was accepted.
-func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR, isEnglishWanted bool) error {
+func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base, previousURL string, planPR plan.PR, commitTitle string, hasPR bool, loaded config.Config) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -405,7 +417,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	reviewOrder, reviewOrderErr := claude.ReviewOrder(ctx, diff)
 	input.ReviewOrder, input.IsMissingReviewOrder = reviewOrder, reviewOrderErr != nil
 	var body string
-	if isEnglishWanted {
+	if slices.Contains(loaded.Lang, "en") {
 		translate := func(korean string) (string, error) { return claude.Translate(ctx, korean) }
 		body, err = pr.BuildBilingualBody(input, translate)
 	} else {
@@ -414,21 +426,46 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if err != nil {
 		return err
 	}
-	if hasPR {
-		return pr.EditBody(worktreeDir, branch, body)
+	appToken, err := appToken(ctx, loaded, worktreeDir)
+	if err != nil {
+		return err
 	}
-	prURL, err := pr.Create(worktreeDir, base, planPR.Type+": "+planPR.Title, body)
+	if hasPR {
+		return pr.EditBody(worktreeDir, appToken, branch, body)
+	}
+	prURL, err := pr.Create(worktreeDir, appToken, base, planPR.Type+": "+planPR.Title, body)
 	if err != nil {
 		return err
 	}
 	indent.Fprintf(stdout, 1, "PR: %s\n", prURL)
 	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: commitTitle, URL: prURL})
 	if previousURL != "" {
-		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
+		if err := pr.LinkStack(worktreeDir, appToken, previousURL, prURL); err != nil {
 			return err
 		}
 	}
 	return state.SavePRStatus(statePath, planPR.Slug, prURL, "OPEN")
+}
+
+// appToken returns a fresh token for the App nightcap.yml names on the repo at repoDir, or "" when it names none.
+// It is asked right before each use because a token dies after an hour and a night runs longer.
+func appToken(ctx context.Context, loaded config.Config, repoDir string) (string, error) {
+	if loaded.AppID == 0 || loaded.AppKey == "" {
+		return "", nil
+	}
+	jwt, err := ghapp.JWT(loaded.AppID, loaded.AppKey)
+	if err != nil {
+		return "", fmt.Errorf("app: %w", err)
+	}
+	ownerRepo, err := pr.RepoName(repoDir)
+	if err != nil {
+		return "", err
+	}
+	token, err := ghapp.Token(ctx, jwt, ownerRepo)
+	if err != nil {
+		return "", fmt.Errorf("app: %w", err)
+	}
+	return token, nil
 }
 
 // bodyInput returns the PR body's values: planPR's summary and every commit that ended green or read-code.
@@ -449,7 +486,7 @@ func bodyInput(planPR plan.PR, savedPR state.PR, lastCommitTitle string) pr.Body
 }
 
 // labelWhenFinished adds, once every commit is done, the label the PR's mark names, and turns on auto-merge for 🤖.
-func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod string, planPR plan.PR) error {
+func labelWhenFinished(ctx context.Context, stdout io.Writer, statePath, worktreeDir string, planPR plan.PR, loaded config.Config) error {
 	saved, err := state.Load(statePath)
 	if err != nil {
 		return err
@@ -462,12 +499,16 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	}
 	branch := planPR.Type + "/" + planPR.Slug
 	label := pr.ReadingLabel(planPR.Mark)
-	if err := pr.AddLabel(worktreeDir, branch, label); err != nil {
+	appToken, err := appToken(ctx, loaded, worktreeDir)
+	if err != nil {
+		return err
+	}
+	if err := pr.AddLabel(worktreeDir, appToken, branch, label); err != nil {
 		return err
 	}
 	indent.Fprintf(stdout, 1, "label: %s\n", label)
 	if planPR.Mark == plan.MarkAuto {
-		if err := pr.EnableAutoMerge(worktreeDir, branch, mergeMethod); err != nil {
+		if err := pr.EnableAutoMerge(worktreeDir, appToken, branch, loaded.MergeMethod); err != nil {
 			return err
 		}
 		indent.Fprintf(stdout, 1, "auto-merge: %s\n", branch)

@@ -11,4 +11,8 @@ type Config struct {
 	Webhook        string   `yaml:"webhook"`          // Discord or Slack webhook URL for the end-of-night message; empty sends nothing
 	Lang           []string `yaml:"lang"`             // PR body languages, e.g. [ko] or [en, ko]
 	MergeMethod    string   `yaml:"merge_method"`     // how a 🤖 PR auto-merges: rebase, otherwise merge
+	AuthorName     string   `yaml:"author_name"`      // author and committer of night commits, set only with author_email; empty keeps the gitconfig
+	AuthorEmail    string   `yaml:"author_email"`
+	AppID          int64    `yaml:"app_id"`  // GitHub App nightcap signs in as, set only with app_key; 0 skips it
+	AppKey         string   `yaml:"app_key"` // path to the .pem private key GitHub gave the App
 }

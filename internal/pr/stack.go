@@ -6,7 +6,7 @@ func stackArgs(previousURL, newURL string) []string {
 }
 
 // LinkStack ties the PR at newURL onto the PR at previousURL as a GitHub stacked PR.
-func LinkStack(worktreeDir, previousURL, newURL string) error {
-	_, err := runGh(worktreeDir, stackArgs(previousURL, newURL)...)
+func LinkStack(worktreeDir, appToken, previousURL, newURL string) error {
+	_, err := runGhAs(worktreeDir, appToken, stackArgs(previousURL, newURL)...)
 	return err
 }

@@ -6,6 +6,7 @@ func createArgs(base, title, bodyPath string) []string {
 }
 
 // Create opens a PR from the worktree's branch into base and returns its URL.
-func Create(worktreeDir, base, title, body string) (string, error) {
-	return runGhWithBody(worktreeDir, body, func(bodyPath string) []string { return createArgs(base, title, bodyPath) })
+// A non-empty appToken opens it as that App; an empty one opens it as your own gh login.
+func Create(worktreeDir, appToken, base, title, body string) (string, error) {
+	return runGhWithBody(worktreeDir, appToken, body, func(bodyPath string) []string { return createArgs(base, title, bodyPath) })
 }
