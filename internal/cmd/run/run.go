@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"nightcap/internal/client/claude"
+	"nightcap/internal/client/ghapp"
 	"nightcap/internal/config"
 	"nightcap/internal/events"
 	"nightcap/internal/git"
@@ -56,6 +57,17 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	if loaded.AppID != 0 && loaded.AppKey != "" {
+		jwt, err := ghapp.JWT(loaded.AppID, loaded.AppKey)
+		if err != nil {
+			return fmt.Errorf("app: %w", err)
+		}
+		appName, err := ghapp.Name(ctx, jwt)
+		if err != nil {
+			return fmt.Errorf("app: %w", err)
+		}
+		fmt.Fprintf(stdout, "app: %s\n", appName)
+	}
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a commit, so a night that runs nothing never calls claude
 	dataDir, err := path.DataDir(meta.Repo)
