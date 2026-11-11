@@ -22,7 +22,7 @@ type Result struct {
 	SessionID string // pass to the next RunRound to continue this conversation
 }
 
-// ParseResult reads the JSON that `claude -p --output-format json` prints.
+// ParseResult reads the result JSON that `claude -p` prints: the whole output with json, the last line with stream-json.
 func ParseResult(raw []byte) (Result, error) {
 	var output struct {
 		Type           string `json:"type"`

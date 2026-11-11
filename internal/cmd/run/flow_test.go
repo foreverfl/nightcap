@@ -24,6 +24,7 @@ func TestRunPrintsPickedPR(t *testing.T) {
 		"  branch: feat/first",
 		"  worktree: " + filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees/first"),
 		"  take  add it",
+		`    "ok"`,
 		"  ran  add it: done (log: " + filepath.Join(testsetup.RunDataDir(t, repo), "logs/first/commit1-round1.log") + ")",
 		"  test: green",
 		"  added lines: 0",

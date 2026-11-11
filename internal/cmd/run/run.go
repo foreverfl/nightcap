@@ -16,6 +16,7 @@ import (
 	"nightcap/internal/config"
 	"nightcap/internal/events"
 	"nightcap/internal/git"
+	"nightcap/internal/indent"
 	"nightcap/internal/notify"
 	"nightcap/internal/path"
 	"nightcap/internal/plan"
@@ -153,13 +154,15 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	if err != nil {
 		return picked, false, err
 	}
-	fmt.Fprintf(stdout, "%s\n  branch: %s\n  worktree: %s\n", planPath, branch, worktreeDir)
+	fmt.Fprintln(stdout, planPath)
+	indent.Fprintf(stdout, 1, "branch: %s\n", branch)
+	indent.Fprintf(stdout, 1, "worktree: %s\n", worktreeDir)
 	for _, commit := range planPR.Commits {
 		mark := "skip"
 		if commit.HasTest {
 			mark = "take"
 		}
-		fmt.Fprintf(stdout, "  %s  %s\n", mark, commit.Title)
+		indent.Fprintf(stdout, 1, "%s  %s\n", mark, commit.Title)
 	}
 
 	for index, commit := range planPR.Commits {
@@ -176,7 +179,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 			*startUsage = current
 		}
 		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
-			fmt.Fprintf(stdout, "  stop: %s\n", reason)
+			indent.Fprintf(stdout, 1, "stop: %s\n", reason)
 			return picked, false, state.SaveCommit(statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
 		if err := runCommit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, commit, statePath, runPath); err != nil {
@@ -232,7 +235,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		record.Attempts = round
 		logPath := filepath.Join(filepath.Dir(statePath), "logs", slug, fmt.Sprintf("commit%d-round%d.log", number, round))
 		roundStarted := time.Now()
-		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath)
+		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, logPath, stdout)
 		if err != nil {
 			return err
 		}
@@ -241,7 +244,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		}
 		appendEvent(runPath, events.Event{Kind: "round", At: time.Now(), PR: slug, Commit: commit.Title,
 			Round: round, Seconds: int(time.Since(roundStarted).Seconds()), SessionID: result.SessionID})
-		fmt.Fprintf(stdout, "  ran  %s: %s (log: %s)\n", commit.Title, result.Outcome, logPath)
+		indent.Fprintf(stdout, 1, "ran  %s: %s (log: %s)\n", commit.Title, result.Outcome, logPath)
 		if result.Outcome == claude.RateLimited {
 			usageJSON, _ := claude.Usage(ctx)
 			current, _ := usage.Read(usageJSON)
@@ -251,11 +254,11 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 			reset, afterWork := windowReset(time.Now(), current, loaded.WorkStart)
 			// the reset comes after work_start, so sleeping would carry the run into the workday
 			if afterWork != "" {
-				fmt.Fprintf(stdout, "  stop: rate limited, %s\n", afterWork)
+				indent.Fprintf(stdout, 1, "stop: rate limited, %s\n", afterWork)
 				record.Result, record.Reason = "stopped", "rate limited, "+afterWork
 				return state.SaveCommit(statePath, slug, commit.Title, record)
 			}
-			fmt.Fprintf(stdout, "  sleep until %s\n", reset.Local().Format("15:04"))
+			indent.Fprintf(stdout, 1, "sleep until %s\n", reset.Local().Format("15:04"))
 			sleepUntil(ctx, reset)
 			continue
 		}
@@ -267,7 +270,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "  test: %s\n", color(tested.Green))
+		indent.Fprintf(stdout, 1, "test: %s\n", color(tested.Green))
 		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: commit.Title, Result: color(tested.Green)})
 		failure := tested.Tail
 		record.Result, record.Reason, record.TestTail = "red", "", tested.Tail
@@ -299,7 +302,7 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		}
 		failureTail = failure
 	}
-	fmt.Fprintln(stdout, "  blocked")
+	indent.Fprintf(stdout, 1, "blocked\n")
 	appendEvent(runPath, events.Event{Kind: "blocked", At: time.Now(), PR: slug, Commit: commit.Title})
 	record.Result = "blocked"
 	return state.SaveCommit(statePath, slug, commit.Title, record)
@@ -357,20 +360,20 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 		return verdict.Result{}, err
 	}
 	for _, change := range changes {
-		fmt.Fprintf(stdout, "  %s %s\n", change.Status, change.Path)
+		indent.Fprintf(stdout, 1, "%s %s\n", change.Status, change.Path)
 	}
 	addedLines, err := git.AddedLines(worktreeDir, base)
 	if err != nil {
 		return verdict.Result{}, err
 	}
-	fmt.Fprintf(stdout, "  added lines: %d\n", len(addedLines))
+	indent.Fprintf(stdout, 1, "added lines: %d\n", len(addedLines))
 	result := verdict.Classify(changes, addedLines, verdict.WherePaths(commit.Body), meta.Protected, meta.Dependencies)
 	if result.Red {
-		fmt.Fprintf(stdout, "  verdict: red (%s)\n", result.Reason)
+		indent.Fprintf(stdout, 1, "verdict: red (%s)\n", result.Reason)
 	} else if result.ReadCode {
-		fmt.Fprintf(stdout, "  verdict: green, read the code (%s)\n", result.Reason)
+		indent.Fprintf(stdout, 1, "verdict: green, read the code (%s)\n", result.Reason)
 	} else {
-		fmt.Fprintln(stdout, "  verdict: green")
+		indent.Fprintf(stdout, 1, "verdict: green\n")
 	}
 	return result, nil
 }
@@ -418,7 +421,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "  PR: %s\n", prURL)
+	indent.Fprintf(stdout, 1, "PR: %s\n", prURL)
 	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: commitTitle, URL: prURL})
 	if previousURL != "" {
 		if err := pr.LinkStack(worktreeDir, previousURL, prURL); err != nil {
@@ -462,12 +465,12 @@ func labelWhenFinished(stdout io.Writer, statePath, worktreeDir, mergeMethod str
 	if err := pr.AddLabel(worktreeDir, branch, label); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "  label: %s\n", label)
+	indent.Fprintf(stdout, 1, "label: %s\n", label)
 	if planPR.Mark == plan.MarkAuto {
 		if err := pr.EnableAutoMerge(worktreeDir, branch, mergeMethod); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "  auto-merge: %s\n", branch)
+		indent.Fprintf(stdout, 1, "auto-merge: %s\n", branch)
 	}
 	return nil
 }

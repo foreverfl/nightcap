@@ -73,11 +73,16 @@ func WritePlanAndConfig(t *testing.T, repo, test, configYAML string) {
 	}
 }
 
-// UseFakeClaude points NIGHTCAP_CLAUDE at a script that answers every round with a Done result JSON.
+// UseFakeClaude points NIGHTCAP_CLAUDE at a script that answers every round in stream-json: a system, an assistant and a Done result line.
 func UseFakeClaude(t *testing.T) {
 	t.Helper()
 	fakeClaude := filepath.Join(t.TempDir(), "claude")
-	script := "#!/bin/sh\necho '{\"type\":\"result\",\"result\":\"ok\"}'\n"
+	script := strings.Join([]string{
+		"#!/bin/sh",
+		`echo '{"type":"system","subtype":"init"}'`,
+		`echo '{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}'`,
+		`echo '{"type":"result","result":"ok"}'`,
+	}, "\n") + "\n"
 	if err := os.WriteFile(fakeClaude, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
