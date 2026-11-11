@@ -11,4 +11,6 @@ type Config struct {
 	Webhook        string   `yaml:"webhook"`          // Discord or Slack webhook URL for the end-of-night message; empty sends nothing
 	Lang           []string `yaml:"lang"`             // PR body languages, e.g. [ko] or [en, ko]
 	MergeMethod    string   `yaml:"merge_method"`     // how a 🤖 PR auto-merges: rebase, otherwise merge
+	AuthorName     string   `yaml:"author_name"`      // author and committer of night commits, set only with author_email; empty keeps the gitconfig
+	AuthorEmail    string   `yaml:"author_email"`
 }

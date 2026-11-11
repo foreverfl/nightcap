@@ -16,8 +16,9 @@ import (
 )
 
 // RunRound runs one `claude -p` round in worktreeDir, appending each output line to logPath and what claude does to screen as it comes; a non-empty sessionID resumes that conversation.
+// When authorName and authorEmail are both set, the commits claude makes carry them as author and committer.
 // It fails when claude cannot start, the log cannot be written, or the last line is not a result JSON.
-func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTurns int, allowedTools []string, logPath string, screen io.Writer) (Result, error) {
+func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTurns int, allowedTools []string, authorName, authorEmail, logPath string, screen io.Writer) (Result, error) {
 	command := exec.CommandContext(ctx, claudeBinary(),
 		"-p", prompt,
 		"--max-turns", strconv.Itoa(maxTurns),
@@ -28,6 +29,12 @@ func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTur
 		command.Args = append(command.Args, "--resume", sessionID)
 	}
 	command.Dir = worktreeDir
+	if authorName != "" && authorEmail != "" {
+		command.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME="+authorName, "GIT_AUTHOR_EMAIL="+authorEmail,
+			"GIT_COMMITTER_NAME="+authorName, "GIT_COMMITTER_EMAIL="+authorEmail,
+		)
+	}
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	stdoutPipe, err := command.StdoutPipe()
