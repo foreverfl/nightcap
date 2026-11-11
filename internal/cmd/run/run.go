@@ -429,7 +429,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if hasPR {
 		return pr.EditBody(worktreeDir, branch, body)
 	}
-	prURL, err := pr.Create(worktreeDir, base, planPR.Type+": "+planPR.Title, body)
+	prURL, err := pr.Create(worktreeDir, "", base, planPR.Type+": "+planPR.Title, body)
 	if err != nil {
 		return err
 	}
