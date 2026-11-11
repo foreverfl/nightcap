@@ -118,26 +118,10 @@ func TestRunMarksCommitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	}
 }
 
-func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
+func TestRunTakesAPRThatEndedBlockedAgain(t *testing.T) {
 	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
 	testsetup.UseFakeClaude(t)
 	testsetup.WritePlanAndConfig(t, repo, "false", "max_rounds: 2\n")
-	planFile, err := os.OpenFile("commit-bot.md", os.O_APPEND|os.O_WRONLY, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// a second PR below first, which must wait while first is blocked
-	secondPR := strings.Join([]string{
-		"",
-		"## 📄 feat: second (second)",
-		"",
-		"- [ ] show it",
-		"  - DONE  go test passes",
-	}, "\n") + "\n"
-	if _, err := planFile.WriteString(secondPR); err != nil {
-		t.Fatal(err)
-	}
-	planFile.Close()
 	var firstStdout, secondStdout bytes.Buffer
 	if err := Run([]string{"commit-bot.md"}, &firstStdout); err != nil {
 		t.Fatalf("first run: %v", err)
@@ -145,12 +129,9 @@ func TestRunStopsAtAPRThatEndedBlocked(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &secondStdout); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
-	want := strings.Join([]string{
-		"stop first: blocked, the PRs below wait",
-		"commit-bot.md: nothing to take",
-	}, "\n") + "\n"
-	if secondStdout.String() != want {
-		t.Fatalf("second run stdout = %q, want %q", secondStdout.String(), want)
+	secondRunLines := strings.Split(secondStdout.String(), "\n")
+	if secondRunLines[1] != "  branch: feat/first" {
+		t.Fatalf("second run should take first again, got %q", secondStdout.String())
 	}
 }
 
