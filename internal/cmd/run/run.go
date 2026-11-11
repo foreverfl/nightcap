@@ -62,7 +62,7 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		if err != nil {
 			return fmt.Errorf("app: %w", err)
 		}
-		appName, err := ghapp.Name(ctx, jwt)
+		appName, err := ghapp.AppName(ctx, jwt)
 		if err != nil {
 			return fmt.Errorf("app: %w", err)
 		}
