@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,7 @@ func TestRunRoundWritesEveryStreamLineToTheLogInOrder(t *testing.T) {
 	testsetup.UseFakeClaude(t)
 	logPath := filepath.Join(t.TempDir(), "commit1-round1.log")
 
-	result, err := RunRound(context.Background(), t.TempDir(), "add it", "", 1, nil, logPath)
+	result, err := RunRound(context.Background(), t.TempDir(), "add it", "", 1, nil, logPath, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
