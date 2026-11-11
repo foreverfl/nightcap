@@ -18,6 +18,7 @@ It puts the latest release in `~/.local/bin/nightcap` and adds that folder to PA
 nightcap run ~/work/todolist/blog-v2/commit-bot.md     # runs every open commit, PR by PR, until nothing is left, a commit fails or usage runs out
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # prints the plan's repo and its worktrees
 nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # prints what a night run cannot use
+nightcap clean                                         # removes every worktree nightcap left under ~/.cache/nightcap
 nightcap init                                          # writes the example config to ~/.config/nightcap/nightcap.yml
 nightcap config                                        # opens that file in $VISUAL or $EDITOR
 nightcap version

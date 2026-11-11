@@ -2,6 +2,7 @@ package git
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -24,6 +25,27 @@ func AddWorktree(repo, base, branch, worktreeDir string) (string, error) {
 // RemoveWorktree deletes the worktree at worktreeDir, uncommitted changes included; the branch stays.
 func RemoveWorktree(repo, worktreeDir string) error {
 	_, err := runGit(repo, "worktree", "remove", "--force", worktreeDir)
+	return err
+}
+
+// RepoOf returns the main repo folder that the worktree at worktreeDir belongs to.
+func RepoOf(worktreeDir string) (string, error) {
+	commonGitDir, err := runGit(worktreeDir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Dir(strings.TrimSpace(commonGitDir)), nil
+}
+
+// WorktreeBranch returns the name of the branch checked out in worktreeDir.
+func WorktreeBranch(worktreeDir string) (string, error) {
+	branch, err := runGit(worktreeDir, "rev-parse", "--abbrev-ref", "HEAD")
+	return strings.TrimSpace(branch), err
+}
+
+// DeleteBranch deletes the local branch in repo, unpushed commits included.
+func DeleteBranch(repo, branch string) error {
+	_, err := runGit(repo, "branch", "-D", branch)
 	return err
 }
 

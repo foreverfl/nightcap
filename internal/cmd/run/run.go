@@ -101,7 +101,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	if err != nil {
 		return picked, false, err
 	}
-	var notBlocked []plan.PR
+	var prsToDo []plan.PR
 	hasPR := map[string]bool{}
 	baseFor := map[string]string{}
 	previousOpenBranch := ""
@@ -115,10 +115,6 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		stackOnto[planPR.Slug] = previousOpenURL
 		previousOpenBranch = ""
 		previousOpenURL = ""
-		if state.IsBlocked(saved.PRs[planPR.Slug]) {
-			fmt.Fprintf(stdout, "stop %s: blocked, the PRs below wait\n", planPR.Title)
-			break // plans are written top to bottom, so a PR below stands on this one
-		}
 		if len(planPR.Commits) > 0 {
 			view, err := pr.ViewBranch(meta.Repo, planPR.Type+"/"+planPR.Slug)
 			if err != nil {
@@ -143,9 +139,9 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if isPRDone(saved.PRs[planPR.Slug], planPR) {
 			continue // its branch above still becomes the base of the PR below
 		}
-		notBlocked = append(notBlocked, planPR)
+		prsToDo = append(prsToDo, planPR)
 	}
-	planPR, ok := plan.Pick(notBlocked)
+	planPR, ok := plan.Pick(prsToDo)
 	if !ok {
 		fmt.Fprintf(stdout, "%s: nothing to take\n", planPath)
 		return nil, false, nil

@@ -65,16 +65,6 @@ func SaveCommit(path, prSlug, commitTitle string, commit Commit) error {
 	return Save(path, current)
 }
 
-// IsBlocked reports whether any commit of pr ended blocked.
-func IsBlocked(pr PR) bool {
-	for _, commit := range pr.Commits {
-		if commit.Result == "blocked" {
-			return true
-		}
-	}
-	return false
-}
-
 // SavePRStatus notes the PR URL and state gh reported for the PR prSlug, keeping the rest of the state file.
 func SavePRStatus(path, prSlug, prURL, prState string) error {
 	current, err := Load(path)

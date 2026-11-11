@@ -18,6 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/foreverfl/nightcap/main/install.sh 
 nightcap run ~/work/todolist/blog-v2/commit-bot.md     # 열린 커밋을 PR 순서대로 전부 돌린다. 다 끝나거나, 커밋이 실패하거나, 사용량이 차면 멈춘다
 nightcap status ~/work/todolist/blog-v2/commit-bot.md  # 계획의 레포와 그 워크트리를 찍는다
 nightcap lint ~/work/todolist/blog-v2/commit-bot.md    # 밤 실행이 쓸 수 없는 것을 찍는다
+nightcap clean                                         # nightcap이 ~/.cache/nightcap에 남긴 워크트리를 전부 지운다
 nightcap init                                          # 예시 설정을 ~/.config/nightcap/nightcap.yml에 쓴다
 nightcap config                                        # 그 파일을 $VISUAL이나 $EDITOR로 연다
 nightcap version
