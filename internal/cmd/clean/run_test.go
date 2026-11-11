@@ -3,6 +3,7 @@ package clean
 import (
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -44,5 +45,25 @@ func TestRunWithNoWorktreeSaysNothingToClean(t *testing.T) {
 
 	if output.String() != "nothing to clean\n" {
 		t.Fatalf("output = %q", output.String())
+	}
+}
+
+func TestRunDeletesTheWorktreeBranch(t *testing.T) {
+	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
+	worktreeDir := filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees", "first")
+	if _, err := git.AddWorktree(repo, "main", "feat/first", worktreeDir); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Run(io.Discard); err != nil {
+		t.Fatal(err)
+	}
+
+	branches, err := exec.Command("git", "-C", repo, "branch", "--list", "feat/first").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(branches) != "" {
+		t.Fatalf("git branch still lists %q", branches)
 	}
 }

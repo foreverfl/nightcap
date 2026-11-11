@@ -37,6 +37,18 @@ func RepoOf(worktreeDir string) (string, error) {
 	return filepath.Dir(strings.TrimSpace(commonGitDir)), nil
 }
 
+// WorktreeBranch returns the name of the branch checked out in worktreeDir.
+func WorktreeBranch(worktreeDir string) (string, error) {
+	branch, err := runGit(worktreeDir, "rev-parse", "--abbrev-ref", "HEAD")
+	return strings.TrimSpace(branch), err
+}
+
+// DeleteBranch deletes the local branch in repo, unpushed commits included.
+func DeleteBranch(repo, branch string) error {
+	_, err := runGit(repo, "branch", "-D", branch)
+	return err
+}
+
 // ListWorktrees returns one line per worktree of repo, as `git worktree list` prints them.
 func ListWorktrees(repo string) ([]string, error) {
 	output, err := runGit(repo, "worktree", "list")

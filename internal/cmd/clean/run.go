@@ -9,7 +9,7 @@ import (
 	"nightcap/internal/path"
 )
 
-// Run removes every worktree folder nightcap left under its cache, whichever repo it belongs to, and prints each one.
+// Run removes every worktree folder nightcap left under its cache and the branch checked out in it, whichever repo it belongs to, and prints each one.
 // It prints "nothing to clean" when there is none, and fails when git cannot find or remove one.
 func Run(stdout io.Writer) error {
 	everyRepoCacheDir, err := path.CacheDir("*")
@@ -29,10 +29,17 @@ func Run(stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
+		branch, err := git.WorktreeBranch(worktreeDir)
+		if err != nil {
+			return err
+		}
 		if err := git.RemoveWorktree(repo, worktreeDir); err != nil {
 			return err
 		}
-		fmt.Fprintln(stdout, "removed", worktreeDir)
+		if err := git.DeleteBranch(repo, branch); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "removed %s (%s)\n", worktreeDir, branch)
 	}
 	return nil
 }

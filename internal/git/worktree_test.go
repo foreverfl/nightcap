@@ -76,3 +76,38 @@ func TestRemoveWorktreeDeletesTheFolder(t *testing.T) {
 		t.Fatalf("got %d worktrees, want 1: %q", len(lines), lines)
 	}
 }
+
+func TestWorktreeBranchNamesTheCheckedOutBranch(t *testing.T) {
+	repo := oneRepo(t)
+	dir, err := AddWorktree(repo, "main", "feat/feed", filepath.Join(t.TempDir(), "feed"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	branch, err := WorktreeBranch(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if branch != "feat/feed" {
+		t.Fatalf("branch = %q, want feat/feed", branch)
+	}
+}
+
+func TestDeleteBranchDeletesAnUnmergedBranch(t *testing.T) {
+	repo := oneRepo(t)
+	dir, err := AddWorktree(repo, "main", "feat/feed", filepath.Join(t.TempDir(), "feed"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "unmerged").CombinedOutput(); err != nil {
+		t.Fatalf("commit: %v\n%s", err, output)
+	}
+	if err := RemoveWorktree(repo, dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := DeleteBranch(repo, "feat/feed"); err != nil {
+		t.Fatal(err)
+	}
+	if branchExists(repo, "feat/feed") {
+		t.Fatal("feat/feed should be gone")
+	}
+}
