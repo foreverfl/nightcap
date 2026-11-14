@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"nightcap/internal/config"
+	"nightcap/internal/store/config"
 )
 
 // Run writes example as the config file, or says the file already exists and leaves it alone.

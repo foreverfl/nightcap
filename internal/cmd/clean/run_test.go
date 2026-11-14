@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"nightcap/internal/git"
+	"nightcap/internal/client/git"
 	"nightcap/internal/testsetup"
 )
 

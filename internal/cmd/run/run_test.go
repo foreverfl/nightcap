@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"nightcap/internal/config"
-	"nightcap/internal/notify"
-	"nightcap/internal/plan"
-	"nightcap/internal/state"
-	"nightcap/internal/usage"
+	"nightcap/internal/client/notify"
+	"nightcap/internal/rule/usage"
+	"nightcap/internal/store/config"
+	"nightcap/internal/store/plan"
+	"nightcap/internal/store/state"
 )
 
 func TestUsageStopReason(t *testing.T) {

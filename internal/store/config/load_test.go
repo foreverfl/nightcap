@@ -69,7 +69,7 @@ func TestLoadReadsLimits(t *testing.T) {
 }
 
 func TestLoadReadsTheExample(t *testing.T) {
-	got, err := Load("../../examples/nightcap.yml")
+	got, err := Load("../../../examples/nightcap.yml")
 	if err != nil {
 		t.Fatal(err)
 	}

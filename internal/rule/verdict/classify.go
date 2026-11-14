@@ -4,7 +4,7 @@ import (
 	"path"
 	"strings"
 
-	"nightcap/internal/git"
+	"nightcap/internal/client/git"
 )
 
 // Result is what the branch's changes say about a commit whose test passed; Red means the commit is not accepted,

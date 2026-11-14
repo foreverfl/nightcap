@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"nightcap/internal/plan"
-	"nightcap/internal/verdict"
+	"nightcap/internal/rule/verdict"
+	"nightcap/internal/store/plan"
 )
 
 // Run prints what in the plan file args[0] a night run cannot use: 👤 PRs, PRs without a mark, commits without a test and unreadable WHERE paths.

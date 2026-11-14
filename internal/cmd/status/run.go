@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"nightcap/internal/git"
-	"nightcap/internal/plan"
+	"nightcap/internal/client/git"
+	"nightcap/internal/store/plan"
 )
 
 // Run prints the repo the frontmatter of the plan file args[0] names, and that repo's worktrees.
