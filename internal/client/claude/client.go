@@ -21,6 +21,7 @@ import (
 func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTurns int, allowedTools []string, authorName, authorEmail, logPath string, screen io.Writer) (Result, error) {
 	command := exec.CommandContext(ctx, claudeBinary(),
 		"-p", prompt,
+		"--model", "opus",
 		"--max-turns", strconv.Itoa(maxTurns),
 		"--output-format", "stream-json", "--verbose",
 		"--allowedTools", strings.Join(allowedTools, ","),
