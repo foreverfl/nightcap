@@ -85,10 +85,14 @@ func TestRunCommitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 	sleepUntil = func(_ context.Context, wakeAt time.Time) { sleptUntil = wakeAt }
 
 	statePath := filepath.Join(repo, ".nightcap", "state.json")
-	loaded := config.Config{MaxRounds: 3}
-	meta := plan.Meta{Repo: repo, Test: "true"}
+	nightRun := nightRunSettings{
+		loaded:      config.Config{MaxRounds: 3},
+		frontmatter: plan.Meta{Repo: repo, Test: "true"},
+		statePath:   statePath,
+		runPath:     filepath.Join(repo, ".nightcap", "runs", "run.jsonl"),
+	}
 	commit := plan.Commit{Title: "add it"}
-	if err := runCommit(context.Background(), io.Discard, loaded, meta, repo, "main", "feed", 1, commit, statePath, filepath.Join(repo, ".nightcap", "runs", "run.jsonl")); err != nil {
+	if err := runCommit(context.Background(), io.Discard, nightRun, repo, "main", "feed", 1, commit); err != nil {
 		t.Fatal(err)
 	}
 	saved, _ := state.Load(statePath)

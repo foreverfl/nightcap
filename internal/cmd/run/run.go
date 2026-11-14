@@ -28,6 +28,14 @@ import (
 	"nightcap/internal/verdict"
 )
 
+// nightRunSettings holds the values one `nightcap run` reads once and keeps until it ends.
+type nightRunSettings struct {
+	loaded      config.Config // nightcap.yml
+	frontmatter plan.Meta     // the plan file's repo, test, protected and dependencies
+	statePath   string        // state.json, where each commit's result is kept across runs
+	runPath     string        // this run's events file
+}
+
 // Run goes down the plan file args[0] PR by PR, running every open commit in a worktree of the frontmatter's repo, until nothing is left or a commit is not accepted.
 // It fails when no plan file is named or the frontmatter leaves a key out, and when the config, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) (runErr error) {
@@ -95,9 +103,10 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		appendEvent(runPath, events.Event{Kind: "run_end", At: time.Now(), Reason: reason})
 	}()
 
+	nightRun := nightRunSettings{loaded: loaded, frontmatter: meta, statePath: statePath, runPath: runPath}
 	// a PR whose commits all ended accepted lets the next pass take the PR below it
 	for {
-		picked, finished, err := runNextPR(ctx, stdout, loaded, meta, planPath, string(planText), statePath, worktreesDir, runPath, &startUsage)
+		picked, finished, err := runNextPR(ctx, stdout, nightRun, planPath, string(planText), worktreesDir, &startUsage)
 		if picked != nil {
 			pickedPRs = append(pickedPRs, *picked)
 		}
@@ -109,8 +118,8 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 
 // runNextPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
 // picked is that PR, nil when there was none; finished is true when every commit of it ended accepted.
-func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, planPath, planText, statePath, worktreesDir, runPath string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
-	saved, err := state.Load(statePath)
+func runNextPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings, planPath, planText, worktreesDir string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
+	saved, err := state.Load(nightRun.statePath)
 	if err != nil {
 		return picked, false, err
 	}
@@ -129,15 +138,15 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		previousOpenBranch = ""
 		openStack = nil
 		if len(planPR.Commits) > 0 {
-			view, err := pr.ViewBranch(meta.Repo, planPR.Type+"/"+planPR.Slug)
+			view, err := pr.ViewBranch(nightRun.frontmatter.Repo, planPR.Type+"/"+planPR.Slug)
 			if err != nil {
 				return picked, false, err
 			}
-			if err := state.SavePRStatus(statePath, planPR.Slug, view.URL, view.State); err != nil {
+			if err := state.SavePRStatus(nightRun.statePath, planPR.Slug, view.URL, view.State); err != nil {
 				return picked, false, err
 			}
 			if view.State == "MERGED" || view.State == "CLOSED" {
-				if err := removeWorktreeIfAny(stdout, meta.Repo, filepath.Join(worktreesDir, planPR.Slug), planPR.Slug, view.State); err != nil {
+				if err := removeWorktreeIfAny(stdout, nightRun.frontmatter.Repo, filepath.Join(worktreesDir, planPR.Slug), planPR.Slug, view.State); err != nil {
 					return picked, false, err
 				}
 				fmt.Fprintf(stdout, "skip %s: PR %s\n", planPR.Title, strings.ToLower(view.State))
@@ -162,7 +171,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	picked = &planPR
 	base := baseFor[planPR.Slug]
 	branch := planPR.Type + "/" + planPR.Slug
-	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, filepath.Join(worktreesDir, planPR.Slug))
+	worktreeDir, err := git.AddWorktree(nightRun.frontmatter.Repo, base, branch, filepath.Join(worktreesDir, planPR.Slug))
 	if err != nil {
 		return picked, false, err
 	}
@@ -181,7 +190,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if !commit.HasTest {
 			continue
 		}
-		if done, _ := isAccepted(statePath, planPR.Slug, commit.Title); done {
+		if done, _ := isAccepted(nightRun.statePath, planPR.Slug, commit.Title); done {
 			continue // done in an earlier run; the plan still shows it as [ ]
 		}
 		// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
@@ -190,25 +199,25 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if !startUsage.Known {
 			*startUsage = current
 		}
-		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
+		if reason := usageStopReason(time.Now(), current, nightRun.loaded); reason != "" {
 			indent.Fprintf(stdout, 1, "stop: %s\n", reason)
-			return picked, false, state.SaveCommit(statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
+			return picked, false, state.SaveCommit(nightRun.statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
-		if err := runCommit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, commit, statePath, runPath); err != nil {
+		if err := runCommit(ctx, stdout, nightRun, worktreeDir, base, planPR.Slug, index+1, commit); err != nil {
 			return picked, false, err
 		}
-		accepted, err := isAccepted(statePath, planPR.Slug, commit.Title)
+		accepted, err := isAccepted(nightRun.statePath, planPR.Slug, commit.Title)
 		if err != nil {
 			return picked, false, err
 		}
 		if !accepted {
 			return picked, false, nil // red, blocked or stopped: the commits below stand on this one
 		}
-		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackBelow[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], loaded); err != nil {
+		if err := openPR(ctx, stdout, nightRun, worktreeDir, base, stackBelow[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug]); err != nil {
 			return picked, false, err
 		}
 		hasPR[planPR.Slug] = true
-		if err := labelWhenFinished(ctx, stdout, statePath, worktreeDir, planPR, loaded); err != nil {
+		if err := labelWhenFinished(ctx, stdout, nightRun.statePath, worktreeDir, planPR, nightRun.loaded); err != nil {
 			return picked, false, err
 		}
 	}
@@ -238,23 +247,32 @@ func isPRDone(savedPR state.PR, planPR plan.PR) bool {
 
 // runCommit runs claude and the test on one commit until the test is green or MaxRounds is spent.
 // It prints "blocked" when the rounds run out, the same failure comes back twice, or claude stops before Done.
-func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, worktreeDir, base, slug string, number int, commit plan.Commit, statePath, runPath string) error {
+func runCommit(ctx context.Context, stdout io.Writer, nightRun nightRunSettings, worktreeDir, base, slug string, number int, commit plan.Commit) error {
 	failureTail := ""
 	sessionID := ""
 	record := state.Commit{}
-	appendEvent(runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: commit.Title})
-	for round := 1; round <= loaded.MaxRounds; round++ {
+	appendEvent(nightRun.runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: commit.Title})
+	for round := 1; round <= nightRun.loaded.MaxRounds; round++ {
 		record.Attempts = round
-		logPath := filepath.Join(filepath.Dir(statePath), "logs", slug, fmt.Sprintf("commit%d-round%d.log", number, round))
+		logPath := filepath.Join(filepath.Dir(nightRun.statePath), "logs", slug, fmt.Sprintf("commit%d-round%d.log", number, round))
 		roundStarted := time.Now()
-		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, loaded.AuthorName, loaded.AuthorEmail, logPath, stdout)
+		result, err := claude.RunRound(ctx, claude.Round{
+			WorktreeDir:  worktreeDir,
+			Prompt:       BuildPrompt(commit.Body, failureTail, sessionID != ""),
+			SessionID:    sessionID,
+			MaxTurns:     nightRun.loaded.MaxTurns,
+			AllowedTools: nightRun.loaded.AllowedTools,
+			AuthorName:   nightRun.loaded.AuthorName,
+			AuthorEmail:  nightRun.loaded.AuthorEmail,
+			LogPath:      logPath,
+		}, stdout)
 		if err != nil {
 			return err
 		}
 		if result.SessionID != "" {
 			sessionID = result.SessionID
 		}
-		appendEvent(runPath, events.Event{Kind: "round", At: time.Now(), PR: slug, Commit: commit.Title,
+		appendEvent(nightRun.runPath, events.Event{Kind: "round", At: time.Now(), PR: slug, Commit: commit.Title,
 			Round: round, Seconds: int(time.Since(roundStarted).Seconds()), SessionID: result.SessionID})
 		indent.Fprintf(stdout, 1, "ran  %s: %s (log: %s)\n", commit.Title, result.Outcome, logPath)
 		if result.Outcome == claude.RateLimited {
@@ -263,12 +281,12 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 			if current.Known {
 				record.UsageAtLimit = &state.UsageAtLimit{Session: current.Session.Percent, WeeklyAll: current.WeeklyAll.Percent}
 			}
-			reset, afterWork := windowReset(time.Now(), current, loaded.WorkStart)
+			reset, afterWork := windowReset(time.Now(), current, nightRun.loaded.WorkStart)
 			// the reset comes after work_start, so sleeping would carry the run into the workday
 			if afterWork != "" {
 				indent.Fprintf(stdout, 1, "stop: rate limited, %s\n", afterWork)
 				record.Result, record.Reason = "stopped", "rate limited, "+afterWork
-				return state.SaveCommit(statePath, slug, commit.Title, record)
+				return state.SaveCommit(nightRun.statePath, slug, commit.Title, record)
 			}
 			indent.Fprintf(stdout, 1, "sleep until %s\n", reset.Local().Format("15:04"))
 			sleepUntil(ctx, reset)
@@ -278,17 +296,17 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 			break
 		}
 		// 1. Test: run the test command from the plan's frontmatter (pass or not)
-		tested, err := test.Run(ctx, worktreeDir, meta.Test)
+		tested, err := test.Run(ctx, worktreeDir, nightRun.frontmatter.Test)
 		if err != nil {
 			return err
 		}
 		indent.Fprintf(stdout, 1, "test: %s\n", color(tested.Green))
-		appendEvent(runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: commit.Title, Result: color(tested.Green)})
+		appendEvent(nightRun.runPath, events.Event{Kind: "test", At: time.Now(), PR: slug, Commit: commit.Title, Result: color(tested.Green)})
 		failure := tested.Tail
 		record.Result, record.Reason, record.TestTail = "red", "", tested.Tail
 		// 2. Verdict: sort what the branch changed by the rules in verdict/classify.go
 		if tested.Green {
-			verdict, err := classifyBranch(stdout, worktreeDir, base, meta, commit)
+			verdict, err := classifyBranch(stdout, worktreeDir, base, nightRun.frontmatter, commit)
 			if err != nil {
 				return err
 			}
@@ -299,13 +317,13 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 					record.Result = "read-code"
 				}
 			}
-			appendEvent(runPath, events.Event{Kind: "verdict", At: time.Now(), PR: slug, Commit: commit.Title, Result: record.Result, Reason: verdict.Reason})
+			appendEvent(nightRun.runPath, events.Event{Kind: "verdict", At: time.Now(), PR: slug, Commit: commit.Title, Result: record.Result, Reason: verdict.Reason})
 			if !verdict.Red {
-				return state.SaveCommit(statePath, slug, commit.Title, record)
+				return state.SaveCommit(nightRun.statePath, slug, commit.Title, record)
 			}
 			failure = verdict.Reason
 		}
-		if err := state.SaveCommit(statePath, slug, commit.Title, record); err != nil {
+		if err := state.SaveCommit(nightRun.statePath, slug, commit.Title, record); err != nil {
 			return err
 		}
 		sameFailureAsLastRound := round > 1 && failure == failureTail
@@ -315,9 +333,9 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		failureTail = failure
 	}
 	indent.Fprintf(stdout, 1, "blocked\n")
-	appendEvent(runPath, events.Event{Kind: "blocked", At: time.Now(), PR: slug, Commit: commit.Title})
+	appendEvent(nightRun.runPath, events.Event{Kind: "blocked", At: time.Now(), PR: slug, Commit: commit.Title})
 	record.Result = "blocked"
-	return state.SaveCommit(statePath, slug, commit.Title, record)
+	return state.SaveCommit(nightRun.statePath, slug, commit.Title, record)
 }
 
 // usageStopReason says why no commit should start now under loaded's limits, or "" when one may.
@@ -391,8 +409,8 @@ func classifyBranch(stdout io.Writer, worktreeDir, base string, meta plan.Meta, 
 }
 
 // openPR pushes planPR's branch and opens its PR, or rewrites the body when hasPR. The caller has checked that commitTitle was accepted.
-func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeDir, base string, stackBelow []string, planPR plan.PR, commitTitle string, hasPR bool, loaded config.Config) error {
-	saved, err := state.Load(statePath)
+func openPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings, worktreeDir, base string, stackBelow []string, planPR plan.PR, commitTitle string, hasPR bool) error {
+	saved, err := state.Load(nightRun.statePath)
 	if err != nil {
 		return err
 	}
@@ -417,7 +435,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	reviewOrder, reviewOrderErr := claude.ReviewOrder(ctx, diff)
 	input.ReviewOrder, input.IsMissingReviewOrder = reviewOrder, reviewOrderErr != nil
 	var body string
-	if slices.Contains(loaded.Lang, "en") {
+	if slices.Contains(nightRun.loaded.Lang, "en") {
 		translate := func(korean string) (string, error) { return claude.Translate(ctx, korean) }
 		body, err = pr.BuildBilingualBody(input, translate)
 	} else {
@@ -426,7 +444,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 	if err != nil {
 		return err
 	}
-	appToken, err := appToken(ctx, loaded, worktreeDir)
+	appToken, err := appToken(ctx, nightRun.loaded, worktreeDir)
 	if err != nil {
 		return err
 	}
@@ -434,7 +452,7 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 		return pr.EditBody(worktreeDir, appToken, branch, body)
 	}
 	title := planPR.Title
-	if slices.Contains(loaded.Lang, "en") {
+	if slices.Contains(nightRun.loaded.Lang, "en") {
 		// a failed translation keeps the Korean title, so a title never stops the night
 		if english, err := claude.TranslateTitle(ctx, planPR.Title); err == nil && english != "" {
 			title = english
@@ -445,13 +463,13 @@ func openPR(ctx context.Context, stdout io.Writer, statePath, runPath, worktreeD
 		return err
 	}
 	indent.Fprintf(stdout, 1, "PR: %s\n", prURL)
-	appendEvent(runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: commitTitle, URL: prURL})
+	appendEvent(nightRun.runPath, events.Event{Kind: "pr_open", At: time.Now(), PR: planPR.Slug, Commit: commitTitle, URL: prURL})
 	if len(stackBelow) > 0 {
 		if err := pr.LinkStack(worktreeDir, appToken, append(stackBelow, prURL)); err != nil {
 			return err
 		}
 	}
-	return state.SavePRStatus(statePath, planPR.Slug, prURL, "OPEN")
+	return state.SavePRStatus(nightRun.statePath, planPR.Slug, prURL, "OPEN")
 }
 
 // appToken returns a fresh token for the App nightcap.yml names on the repo at repoDir, or "" when it names none.
