@@ -40,6 +40,39 @@ func TestRunRoundWritesEveryStreamLineToTheLogInOrder(t *testing.T) {
 	}
 }
 
+func TestRunRoundAsksForOpus(t *testing.T) {
+	argsPath := testsetup.UseFakeClaudeRecordingArgs(t)
+
+	_, err := RunRound(context.Background(), t.TempDir(), "add it", "", 1, nil, "", "", filepath.Join(t.TempDir(), "round.log"), io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	args, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(args), "\n--model\nopus\n") {
+		t.Fatalf("args = %q, want --model opus", args)
+	}
+}
+
+func TestAskOnceAsksForOpus(t *testing.T) {
+	argsPath := testsetup.UseFakeClaudeRecordingArgs(t)
+
+	if _, err := askOnce(context.Background(), "test", "say ok"); err != nil {
+		t.Fatal(err)
+	}
+
+	args, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(args), "\n--model\nopus\n") {
+		t.Fatalf("args = %q, want --model opus", args)
+	}
+}
+
 func TestRunRoundPassesTheAuthorToClaude(t *testing.T) {
 	dir := t.TempDir()
 	fakeClaude := filepath.Join(dir, "claude")

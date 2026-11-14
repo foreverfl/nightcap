@@ -89,6 +89,25 @@ func UseFakeClaude(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 }
 
+// UseFakeClaudeRecordingArgs swaps claude for a fake that saves the flags nightcap passed, so a test can check them (e.g. --model opus).
+// It returns the file holding those flags, one per line; the fake answers with a single result line.
+func UseFakeClaudeRecordingArgs(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	argsPath := filepath.Join(dir, "args")
+	fakeClaude := filepath.Join(dir, "claude")
+	script := strings.Join([]string{
+		"#!/bin/sh",
+		`printf '%s\n' "$@" > "` + argsPath + `"`,
+		`echo '{"type":"result","result":"ok"}'`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(fakeClaude, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
+	return argsPath
+}
+
 // fakeGhPath is the repo's testdata/fake-gh.sh, found from this file so it works from any package's tests.
 var fakeGhPath = func() string {
 	_, thisFile, _, _ := runtime.Caller(0)
