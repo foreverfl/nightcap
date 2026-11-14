@@ -19,13 +19,13 @@ import (
 	"nightcap/internal/client/pr"
 	"nightcap/internal/client/test"
 	"nightcap/internal/indent"
+	"nightcap/internal/rule/usage"
+	"nightcap/internal/rule/verdict"
 	"nightcap/internal/store/config"
 	"nightcap/internal/store/events"
 	"nightcap/internal/store/path"
 	"nightcap/internal/store/plan"
 	"nightcap/internal/store/state"
-	"nightcap/internal/usage"
-	"nightcap/internal/verdict"
 )
 
 // nightRunSettings holds the values one `nightcap run` reads once and keeps until it ends.
