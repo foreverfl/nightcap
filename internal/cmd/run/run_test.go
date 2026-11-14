@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"nightcap/internal/client/notify"
 	"nightcap/internal/config"
-	"nightcap/internal/notify"
 	"nightcap/internal/plan"
 	"nightcap/internal/state"
 	"nightcap/internal/usage"

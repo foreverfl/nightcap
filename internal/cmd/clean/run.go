@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"nightcap/internal/git"
+	"nightcap/internal/client/git"
 	"nightcap/internal/path"
 )
 

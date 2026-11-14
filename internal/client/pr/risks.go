@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"nightcap/internal/git"
+	"nightcap/internal/client/git"
 )
 
 // riskWords maps what a reviewer should look at to the words that mark it on an added line.

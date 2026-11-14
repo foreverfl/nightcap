@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"nightcap/internal/git"
+	"nightcap/internal/client/git"
 	"nightcap/internal/plan"
 )
 

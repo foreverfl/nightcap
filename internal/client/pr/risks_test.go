@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"nightcap/internal/git"
+	"nightcap/internal/client/git"
 )
 
 func TestRiskLinesNameTheFileThatReadsEnv(t *testing.T) {

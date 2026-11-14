@@ -3,7 +3,7 @@ package verdict
 import (
 	"testing"
 
-	"nightcap/internal/git"
+	"nightcap/internal/client/git"
 )
 
 // protected and dependencies are the lists a target gets from nightcap.yml when it names none.
