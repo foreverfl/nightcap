@@ -3,7 +3,7 @@ package pr
 import (
 	"testing"
 
-	"nightcap/internal/plan"
+	"nightcap/internal/store/plan"
 )
 
 func TestReadingLabelFollowsTheMark(t *testing.T) {

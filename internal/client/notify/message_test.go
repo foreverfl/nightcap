@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"nightcap/internal/plan"
+	"nightcap/internal/store/plan"
 )
 
 // oneSummary is a run on blog-v2 from 23:05 to 03:40 with no usage lines.

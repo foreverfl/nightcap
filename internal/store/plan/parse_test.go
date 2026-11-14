@@ -77,7 +77,7 @@ func TestPickSkipsPRWithoutTestableCommit(t *testing.T) {
 }
 
 func TestParseReadsExamplePlans(t *testing.T) {
-	for _, path := range []string{"../../examples/plan.md", "../../examples/plan-ko.md"} {
+	for _, path := range []string{"../../../examples/plan.md", "../../../examples/plan-ko.md"} {
 		text, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

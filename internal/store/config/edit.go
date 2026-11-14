@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/exec"
 
-	"nightcap/internal/path"
+	"nightcap/internal/store/path"
 )
 
 // Edit opens the config file in $VISUAL, then $EDITOR, then vi, and waits for the editor to close.

@@ -1,6 +1,6 @@
 package pr
 
-import "nightcap/internal/plan"
+import "nightcap/internal/store/plan"
 
 const (
 	autoLabel   = "nightcap:auto"

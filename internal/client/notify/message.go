@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"nightcap/internal/plan"
+	"nightcap/internal/store/plan"
 )
 
 // Summary is what one nightcap run did, as the morning message reports it.

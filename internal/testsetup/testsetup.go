@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"nightcap/internal/path"
+	"nightcap/internal/store/path"
 )
 
 // SetUpRepoWithOneCommitPlan moves into a temp folder with a git repo, a one-commit plan and a fake gh, and returns the repo path.

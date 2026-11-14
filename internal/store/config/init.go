@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"nightcap/internal/path"
+	"nightcap/internal/store/path"
 )
 
 // Init writes example to the config file and returns its path; created is false when the file was already there and is left as it is.

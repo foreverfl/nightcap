@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"nightcap/internal/client/notify"
-	"nightcap/internal/config"
-	"nightcap/internal/plan"
-	"nightcap/internal/state"
+	"nightcap/internal/store/config"
+	"nightcap/internal/store/plan"
+	"nightcap/internal/store/state"
 	"nightcap/internal/usage"
 )
 

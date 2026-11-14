@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"nightcap/internal/plan"
+	"nightcap/internal/store/plan"
 	"nightcap/internal/verdict"
 )
 

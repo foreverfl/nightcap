@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"nightcap/internal/client/git"
-	"nightcap/internal/path"
+	"nightcap/internal/store/path"
 )
 
 // Run removes, whichever repo they belong to, every worktree folder nightcap left under its cache with the branch checked out in it,
