@@ -15,7 +15,7 @@ func TestRunRoundWritesEveryStreamLineToTheLogInOrder(t *testing.T) {
 	testsetup.UseFakeClaude(t)
 	logPath := filepath.Join(t.TempDir(), "commit1-round1.log")
 
-	result, err := RunRound(context.Background(), t.TempDir(), "add it", "", 1, nil, "", "", logPath, io.Discard)
+	result, err := RunRound(context.Background(), Round{WorktreeDir: t.TempDir(), Prompt: "add it", LogPath: logPath}, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestRunRoundWritesEveryStreamLineToTheLogInOrder(t *testing.T) {
 func TestRunRoundAsksForOpus(t *testing.T) {
 	argsPath := testsetup.UseFakeClaudeRecordingArgs(t)
 
-	_, err := RunRound(context.Background(), t.TempDir(), "add it", "", 1, nil, "", "", filepath.Join(t.TempDir(), "round.log"), io.Discard)
+	_, err := RunRound(context.Background(), Round{WorktreeDir: t.TempDir(), Prompt: "add it", LogPath: filepath.Join(t.TempDir(), "round.log")}, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,13 @@ func TestRunRoundPassesTheAuthorToClaude(t *testing.T) {
 	}
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 
-	_, err := RunRound(context.Background(), t.TempDir(), "add it", "", 1, nil, "nightcap-cli[bot]", "bot@users.noreply.github.com", filepath.Join(dir, "round.log"), io.Discard)
+	_, err := RunRound(context.Background(), Round{
+		WorktreeDir: t.TempDir(),
+		Prompt:      "add it",
+		AuthorName:  "nightcap-cli[bot]",
+		AuthorEmail: "bot@users.noreply.github.com",
+		LogPath:     filepath.Join(dir, "round.log"),
+	}, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -247,7 +247,16 @@ func runCommit(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		record.Attempts = round
 		logPath := filepath.Join(filepath.Dir(statePath), "logs", slug, fmt.Sprintf("commit%d-round%d.log", number, round))
 		roundStarted := time.Now()
-		result, err := claude.RunRound(ctx, worktreeDir, BuildPrompt(commit.Body, failureTail, sessionID != ""), sessionID, loaded.MaxTurns, loaded.AllowedTools, loaded.AuthorName, loaded.AuthorEmail, logPath, stdout)
+		result, err := claude.RunRound(ctx, claude.Round{
+			WorktreeDir:  worktreeDir,
+			Prompt:       BuildPrompt(commit.Body, failureTail, sessionID != ""),
+			SessionID:    sessionID,
+			MaxTurns:     loaded.MaxTurns,
+			AllowedTools: loaded.AllowedTools,
+			AuthorName:   loaded.AuthorName,
+			AuthorEmail:  loaded.AuthorEmail,
+			LogPath:      logPath,
+		}, stdout)
 		if err != nil {
 			return err
 		}

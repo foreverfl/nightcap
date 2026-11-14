@@ -15,25 +15,36 @@ import (
 	"nightcap/internal/indent"
 )
 
-// RunRound runs one `claude -p` round in worktreeDir, appending each output line to logPath and what claude does to screen as it comes; a non-empty sessionID resumes that conversation.
-// When authorName and authorEmail are both set, the commits claude makes carry them as author and committer.
+// Round is what one `claude -p` round needs.
+type Round struct {
+	WorktreeDir  string   // where claude runs and edits files
+	Prompt       string   // the instruction sent with -p
+	SessionID    string   // when not empty, the round resumes that conversation
+	MaxTurns     int      // passed as --max-turns
+	AllowedTools []string // passed as --allowedTools, joined with commas
+	AuthorName   string   // with AuthorEmail, the author and committer of the commits claude makes
+	AuthorEmail  string   // with AuthorName, the author and committer of the commits claude makes
+	LogPath      string   // where every output line of claude is written
+}
+
+// RunRound runs one claude round, writing each output line to round.LogPath and what claude does to screen as it comes.
 // It fails when claude cannot start, the log cannot be written, or the last line is not a result JSON.
-func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTurns int, allowedTools []string, authorName, authorEmail, logPath string, screen io.Writer) (Result, error) {
+func RunRound(ctx context.Context, round Round, screen io.Writer) (Result, error) {
 	command := exec.CommandContext(ctx, claudeBinary(),
-		"-p", prompt,
+		"-p", round.Prompt,
 		"--model", "opus",
-		"--max-turns", strconv.Itoa(maxTurns),
+		"--max-turns", strconv.Itoa(round.MaxTurns),
 		"--output-format", "stream-json", "--verbose",
-		"--allowedTools", strings.Join(allowedTools, ","),
+		"--allowedTools", strings.Join(round.AllowedTools, ","),
 	)
-	if sessionID != "" {
-		command.Args = append(command.Args, "--resume", sessionID)
+	if round.SessionID != "" {
+		command.Args = append(command.Args, "--resume", round.SessionID)
 	}
-	command.Dir = worktreeDir
-	if authorName != "" && authorEmail != "" {
+	command.Dir = round.WorktreeDir
+	if round.AuthorName != "" && round.AuthorEmail != "" {
 		command.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME="+authorName, "GIT_AUTHOR_EMAIL="+authorEmail,
-			"GIT_COMMITTER_NAME="+authorName, "GIT_COMMITTER_EMAIL="+authorEmail,
+			"GIT_AUTHOR_NAME="+round.AuthorName, "GIT_AUTHOR_EMAIL="+round.AuthorEmail,
+			"GIT_COMMITTER_NAME="+round.AuthorName, "GIT_COMMITTER_EMAIL="+round.AuthorEmail,
 		)
 	}
 	var stderr bytes.Buffer
@@ -43,10 +54,10 @@ func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTur
 		return Result{}, err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(round.LogPath), 0o755); err != nil {
 		return Result{}, err
 	}
-	logFile, err := os.Create(logPath)
+	logFile, err := os.Create(round.LogPath)
 	if err != nil {
 		return Result{}, err
 	}
@@ -55,7 +66,7 @@ func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTur
 	if err := command.Start(); err != nil {
 		return Result{}, fmt.Errorf("claude: %w", err)
 	}
-	lastLine, copyErr := copyLinesToLogAndScreen(stdoutPipe, logFile, screen, worktreeDir)
+	lastLine, copyErr := copyLinesToLogAndScreen(stdoutPipe, logFile, screen, round.WorktreeDir)
 	if copyErr != nil {
 		io.Copy(io.Discard, stdoutPipe) // drain, or claude blocks on a full pipe and Wait never returns
 	}
@@ -69,7 +80,7 @@ func RunRound(ctx context.Context, worktreeDir, prompt, sessionID string, maxTur
 
 	result, parseErr := ParseResult(lastLine)
 	if parseErr != nil && runErr != nil {
-		return Result{}, fmt.Errorf("claude: %w (log: %s)", runErr, logPath)
+		return Result{}, fmt.Errorf("claude: %w (log: %s)", runErr, round.LogPath)
 	}
 	return result, parseErr
 }
