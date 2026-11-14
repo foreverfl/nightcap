@@ -28,6 +28,14 @@ import (
 	"nightcap/internal/verdict"
 )
 
+// nightRun holds the values one `nightcap run` reads once and keeps until it ends.
+type nightRun struct {
+	loaded      config.Config // nightcap.yml
+	frontmatter plan.Meta     // the plan file's repo, test, protected and dependencies
+	statePath   string        // state.json, where each commit's result is kept across runs
+	runPath     string        // this run's events file
+}
+
 // Run goes down the plan file args[0] PR by PR, running every open commit in a worktree of the frontmatter's repo, until nothing is left or a commit is not accepted.
 // It fails when no plan file is named or the frontmatter leaves a key out, and when the config, git, claude or sh fails.
 func Run(args []string, stdout io.Writer) (runErr error) {
@@ -95,9 +103,10 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 		appendEvent(runPath, events.Event{Kind: "run_end", At: time.Now(), Reason: reason})
 	}()
 
+	night := nightRun{loaded: loaded, frontmatter: meta, statePath: statePath, runPath: runPath}
 	// a PR whose commits all ended accepted lets the next pass take the PR below it
 	for {
-		picked, finished, err := runNextPR(ctx, stdout, loaded, meta, planPath, string(planText), statePath, worktreesDir, runPath, &startUsage)
+		picked, finished, err := runNextPR(ctx, stdout, night, planPath, string(planText), worktreesDir, &startUsage)
 		if picked != nil {
 			pickedPRs = append(pickedPRs, *picked)
 		}
@@ -109,8 +118,8 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 
 // runNextPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
 // picked is that PR, nil when there was none; finished is true when every commit of it ended accepted.
-func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta plan.Meta, planPath, planText, statePath, worktreesDir, runPath string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
-	saved, err := state.Load(statePath)
+func runNextPR(ctx context.Context, stdout io.Writer, night nightRun, planPath, planText, worktreesDir string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
+	saved, err := state.Load(night.statePath)
 	if err != nil {
 		return picked, false, err
 	}
@@ -129,15 +138,15 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		previousOpenBranch = ""
 		openStack = nil
 		if len(planPR.Commits) > 0 {
-			view, err := pr.ViewBranch(meta.Repo, planPR.Type+"/"+planPR.Slug)
+			view, err := pr.ViewBranch(night.frontmatter.Repo, planPR.Type+"/"+planPR.Slug)
 			if err != nil {
 				return picked, false, err
 			}
-			if err := state.SavePRStatus(statePath, planPR.Slug, view.URL, view.State); err != nil {
+			if err := state.SavePRStatus(night.statePath, planPR.Slug, view.URL, view.State); err != nil {
 				return picked, false, err
 			}
 			if view.State == "MERGED" || view.State == "CLOSED" {
-				if err := removeWorktreeIfAny(stdout, meta.Repo, filepath.Join(worktreesDir, planPR.Slug), planPR.Slug, view.State); err != nil {
+				if err := removeWorktreeIfAny(stdout, night.frontmatter.Repo, filepath.Join(worktreesDir, planPR.Slug), planPR.Slug, view.State); err != nil {
 					return picked, false, err
 				}
 				fmt.Fprintf(stdout, "skip %s: PR %s\n", planPR.Title, strings.ToLower(view.State))
@@ -162,7 +171,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 	picked = &planPR
 	base := baseFor[planPR.Slug]
 	branch := planPR.Type + "/" + planPR.Slug
-	worktreeDir, err := git.AddWorktree(meta.Repo, base, branch, filepath.Join(worktreesDir, planPR.Slug))
+	worktreeDir, err := git.AddWorktree(night.frontmatter.Repo, base, branch, filepath.Join(worktreesDir, planPR.Slug))
 	if err != nil {
 		return picked, false, err
 	}
@@ -181,7 +190,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if !commit.HasTest {
 			continue
 		}
-		if done, _ := isAccepted(statePath, planPR.Slug, commit.Title); done {
+		if done, _ := isAccepted(night.statePath, planPR.Slug, commit.Title); done {
 			continue // done in an earlier run; the plan still shows it as [ ]
 		}
 		// a failed /usage reads as unknown usage; the percent limits are skipped and the rate-limit error is trusted instead
@@ -190,25 +199,25 @@ func runNextPR(ctx context.Context, stdout io.Writer, loaded config.Config, meta
 		if !startUsage.Known {
 			*startUsage = current
 		}
-		if reason := usageStopReason(time.Now(), current, loaded); reason != "" {
+		if reason := usageStopReason(time.Now(), current, night.loaded); reason != "" {
 			indent.Fprintf(stdout, 1, "stop: %s\n", reason)
-			return picked, false, state.SaveCommit(statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
+			return picked, false, state.SaveCommit(night.statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
-		if err := runCommit(ctx, stdout, loaded, meta, worktreeDir, base, planPR.Slug, index+1, commit, statePath, runPath); err != nil {
+		if err := runCommit(ctx, stdout, night.loaded, night.frontmatter, worktreeDir, base, planPR.Slug, index+1, commit, night.statePath, night.runPath); err != nil {
 			return picked, false, err
 		}
-		accepted, err := isAccepted(statePath, planPR.Slug, commit.Title)
+		accepted, err := isAccepted(night.statePath, planPR.Slug, commit.Title)
 		if err != nil {
 			return picked, false, err
 		}
 		if !accepted {
 			return picked, false, nil // red, blocked or stopped: the commits below stand on this one
 		}
-		if err := openPR(ctx, stdout, statePath, runPath, worktreeDir, base, stackBelow[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], loaded); err != nil {
+		if err := openPR(ctx, stdout, night.statePath, night.runPath, worktreeDir, base, stackBelow[planPR.Slug], planPR, commit.Title, hasPR[planPR.Slug], night.loaded); err != nil {
 			return picked, false, err
 		}
 		hasPR[planPR.Slug] = true
-		if err := labelWhenFinished(ctx, stdout, statePath, worktreeDir, planPR, loaded); err != nil {
+		if err := labelWhenFinished(ctx, stdout, night.statePath, worktreeDir, planPR, night.loaded); err != nil {
 			return picked, false, err
 		}
 	}
