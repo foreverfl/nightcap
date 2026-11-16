@@ -27,7 +27,7 @@ func TestDeleteRemoteBranchRemovesItFromOrigin(t *testing.T) {
 	if output, err := exec.Command("git", "-C", repo, "push", "-q", "origin", "main:feat/first").CombinedOutput(); err != nil {
 		t.Fatalf("git push: %v\n%s", err, output)
 	}
-	if err := DeleteRemoteBranch(repo, "feat/first"); err != nil {
+	if _, err := DeleteRemoteBranch(repo, "feat/first"); err != nil {
 		t.Fatal(err)
 	}
 	remoteHeads, err := runGit(repo, "ls-remote", "origin", "feat/first")
@@ -41,7 +41,7 @@ func TestDeleteRemoteBranchRemovesItFromOrigin(t *testing.T) {
 
 func TestDeleteRemoteBranchWithoutTheBranchIsFine(t *testing.T) {
 	repo := oneRepoWithOrigin(t)
-	if err := DeleteRemoteBranch(repo, "feat/first"); err != nil {
+	if _, err := DeleteRemoteBranch(repo, "feat/first"); err != nil {
 		t.Fatalf("a branch origin does not have should be left alone, got %v", err)
 	}
 }

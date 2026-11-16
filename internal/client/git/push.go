@@ -6,15 +6,15 @@ func Push(worktreeDir, branch string) error {
 	return err
 }
 
-// DeleteRemoteBranch deletes branch on origin; a branch origin does not have is left alone.
-func DeleteRemoteBranch(repo, branch string) error {
+// DeleteRemoteBranch deletes branch on origin and reports whether there was one to delete; a branch origin does not have is left alone.
+func DeleteRemoteBranch(repo, branch string) (bool, error) {
 	remoteHeads, err := runGit(repo, "ls-remote", "--heads", "origin", "refs/heads/"+branch)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if remoteHeads == "" {
-		return nil
+		return false, nil
 	}
 	_, err = runGit(repo, "push", "origin", "--delete", branch)
-	return err
+	return err == nil, err
 }

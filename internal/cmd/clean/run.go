@@ -28,7 +28,7 @@ func Run(stdout io.Writer) error {
 	return nil
 }
 
-// removeWorktrees removes every folder under ~/.cache/nightcap/*/worktrees and its branch, and returns how many it removed.
+// removeWorktrees removes every folder under ~/.cache/nightcap/*/worktrees and its branch, here and on origin, and returns how many it removed.
 func removeWorktrees(stdout io.Writer) (int, error) {
 	everyRepoCacheDir, err := path.CacheDir("*")
 	if err != nil {
@@ -53,7 +53,15 @@ func removeWorktrees(stdout io.Writer) (int, error) {
 		if err := git.DeleteBranch(repo, branch); err != nil {
 			return 0, err
 		}
-		fmt.Fprintf(stdout, "removed %s (%s)\n", worktreeDir, branch)
+		isRemoteDeleted, err := git.DeleteRemoteBranch(repo, branch)
+		if err != nil {
+			return 0, err
+		}
+		removedBranches := branch
+		if isRemoteDeleted {
+			removedBranches = branch + ", origin too"
+		}
+		fmt.Fprintf(stdout, "removed %s (%s)\n", worktreeDir, removedBranches)
 	}
 	return len(worktreeDirs), nil
 }

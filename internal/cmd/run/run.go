@@ -158,7 +158,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 				if err := git.DeleteBranch(nightRun.frontmatter.Repo, planPR.Type+"/"+planPR.Slug); err != nil {
 					return picked, false, err
 				}
-				if err := git.DeleteRemoteBranch(nightRun.frontmatter.Repo, planPR.Type+"/"+planPR.Slug); err != nil {
+				if _, err := git.DeleteRemoteBranch(nightRun.frontmatter.Repo, planPR.Type+"/"+planPR.Slug); err != nil {
 					return picked, false, err
 				}
 				if err := state.ForgetPR(nightRun.statePath, planPR.Slug); err != nil {

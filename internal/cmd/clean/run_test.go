@@ -69,6 +69,33 @@ func TestRunDeletesTheWorktreeBranch(t *testing.T) {
 	}
 }
 
+func TestRunDeletesTheWorktreeBranchOnOrigin(t *testing.T) {
+	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
+	worktreeDir := filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees", "first")
+	if _, err := git.AddWorktree(repo, "main", "feat/first", worktreeDir); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := exec.Command("git", "-C", repo, "push", "-q", "origin", "feat/first").CombinedOutput(); err != nil {
+		t.Fatalf("git push: %v\n%s", err, output)
+	}
+	var output strings.Builder
+
+	if err := Run(&output); err != nil {
+		t.Fatal(err)
+	}
+
+	if want := "removed " + worktreeDir + " (feat/first, origin too)\n"; output.String() != want {
+		t.Fatalf("output = %q, want %q", output.String(), want)
+	}
+	remoteHeads, err := exec.Command("git", "-C", repo, "ls-remote", "origin", "feat/first").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remoteHeads) != 0 {
+		t.Fatalf("feat/first should be gone from origin, got %q", remoteHeads)
+	}
+}
+
 func TestRunRemovesStateFileAndKeepsLogs(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	dataHome := t.TempDir()
