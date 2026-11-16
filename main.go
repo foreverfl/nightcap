@@ -15,6 +15,7 @@ import (
 	"nightcap/internal/cmd/run"
 	"nightcap/internal/cmd/status"
 	"nightcap/internal/cmd/update"
+	"nightcap/internal/ui/livescreen"
 )
 
 // exampleConfig is examples/nightcap.yml, built into the binary so nightcap init works without the repo.
@@ -44,7 +45,9 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
 		if isTerminal(stdout) {
-			err = run.RunOnLiveScreen(ctx, args[1:], version)
+			err = livescreen.Run(ctx, func(ctx context.Context, stdout io.Writer) error {
+				return run.Run(ctx, args[1:], version, stdout)
+			})
 		} else {
 			err = run.Run(ctx, args[1:], version, stdout)
 		}
