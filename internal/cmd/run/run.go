@@ -149,7 +149,23 @@ func runNextPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 				if err := removeWorktreeIfAny(stdout, nightRun.frontmatter.Repo, filepath.Join(worktreesDir, planPR.Slug), planPR.Slug, view.State); err != nil {
 					return picked, false, err
 				}
-				fmt.Fprintf(stdout, "skip %s: PR %s\n", planPR.Title, strings.ToLower(view.State))
+			}
+			if view.State == "MERGED" {
+				fmt.Fprintf(stdout, "skip %s: PR merged\n", planPR.Title)
+				continue
+			}
+			if view.State == "CLOSED" {
+				if err := git.DeleteBranch(nightRun.frontmatter.Repo, planPR.Type+"/"+planPR.Slug); err != nil {
+					return picked, false, err
+				}
+				if _, err := git.DeleteRemoteBranch(nightRun.frontmatter.Repo, planPR.Type+"/"+planPR.Slug); err != nil {
+					return picked, false, err
+				}
+				if err := state.ForgetPR(nightRun.statePath, planPR.Slug); err != nil {
+					return picked, false, err
+				}
+				fmt.Fprintf(stdout, "redo %s: PR closed\n", planPR.Title)
+				prsToDo = append(prsToDo, planPR)
 				continue
 			}
 			hasPR[planPR.Slug] = view.State == "OPEN"

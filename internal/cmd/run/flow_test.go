@@ -152,6 +152,56 @@ func TestRunSkipsAPRThatWasMerged(t *testing.T) {
 	}
 }
 
+func TestRunTakesAPRThatWasClosedAgain(t *testing.T) {
+	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	var firstStdout, secondStdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &firstStdout); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	testsetup.UseFakeGh(t, map[string]string{"feat/first": "CLOSED"})
+	testsetup.WritePlan(t, repo, "false") // a red check ends the second run before it opens a PR
+	if err := Run([]string{"commit-bot.md"}, &secondStdout); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	want := strings.Join([]string{
+		"removed worktree first: PR closed",
+		"redo first: PR closed",
+		"commit-bot.md",
+		"  branch: feat/first",
+	}, "\n") + "\n"
+	if !strings.HasPrefix(secondStdout.String(), want) {
+		t.Fatalf("a PR that was closed should be taken again, got %q", secondStdout.String())
+	}
+}
+
+func TestRunStartsAClosedPRFromAFreshBranch(t *testing.T) {
+	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	testsetup.UseFakeGh(t, map[string]string{"feat/first": "CLOSED"})
+	testsetup.WritePlan(t, repo, "false")
+	for _, args := range [][]string{
+		{"-C", repo, "switch", "-q", "-c", "feat/first"},
+		{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "last night"},
+		{"-C", repo, "switch", "-q", "main"},
+	} {
+		if output, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, output)
+		}
+	}
+	var stdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
+		t.Fatal(err)
+	}
+	output, err := exec.Command("git", "-C", repo, "log", "--oneline", "main..feat/first").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(output) != 0 {
+		t.Fatalf("the closed PR's commit should be gone from feat/first, got %q", output)
+	}
+}
+
 func TestRunWithoutAPlanFileFails(t *testing.T) {
 	var stdout bytes.Buffer
 	if err := Run(nil, &stdout); err == nil || !strings.Contains(err.Error(), "run: name a plan file") {
