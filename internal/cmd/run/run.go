@@ -89,8 +89,8 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	}
 	worktreesDir := filepath.Join(cacheDir, "worktrees")
 	var pickedPRs []plan.PR // the PRs tonight took, top to bottom
-	// one file per run, under its start date: ~/.local/share/nightcap/blog-v2/runs/261108/225500.jsonl
-	runPath := filepath.Join(dataDir, "runs", started.Format("060102"), started.Format("150405")+".jsonl")
+	// one folder per run, named by its start: ~/.local/share/nightcap/blog-v2/runs/261108/225500/events.jsonl
+	runPath := filepath.Join(dataDir, "runs", started.Format("060102"), started.Format("150405"), "events.jsonl")
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
 		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPRs, started, startUsage)
