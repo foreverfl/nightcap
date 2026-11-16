@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 )
 
@@ -20,24 +21,31 @@ func useFakeGitHub(t *testing.T, status int, body string) {
 	t.Cleanup(func() { apiURL = originalURL })
 }
 
-func TestNewVersionLineNamesTheNewerRelease(t *testing.T) {
-	useFakeGitHub(t, http.StatusOK, `{"tag_name":"v0.1.7"}`)
-	want := "nightcap v0.1.7 is out (you have v0.1.6). Run `nightcap update`."
-	if got := NewVersionLine(context.Background(), "v0.1.6"); got != want {
+func TestNewVersionNoticeNamesTheNewerRelease(t *testing.T) {
+	useFakeGitHub(t, http.StatusOK, `[{"tag_name":"v0.1.7"},{"tag_name":"v0.1.6"}]`)
+	want := []string{"nightcap v0.1.7 is out (you have v0.1.6). Run `nightcap update`."}
+	if got := NewVersionNotice(context.Background(), "v0.1.6"); !slices.Equal(got, want) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
 
-func TestNewVersionLineIsEmptyOnTheSameVersion(t *testing.T) {
-	useFakeGitHub(t, http.StatusOK, `{"tag_name":"v0.1.6"}`)
-	if got := NewVersionLine(context.Background(), "v0.1.6"); got != "" {
+func TestNewVersionNoticeIsEmptyOnTheSameVersion(t *testing.T) {
+	useFakeGitHub(t, http.StatusOK, `[{"tag_name":"v0.1.6"}]`)
+	if got := NewVersionNotice(context.Background(), "v0.1.6"); got != nil {
 		t.Fatalf("the same version should print nothing, got %q", got)
 	}
 }
 
-func TestNewVersionLineIsEmptyWhenGitHubFails(t *testing.T) {
+func TestNewVersionNoticeSkipsADraft(t *testing.T) {
+	useFakeGitHub(t, http.StatusOK, `[{"tag_name":"v0.1.7","draft":true},{"tag_name":"v0.1.6"}]`)
+	if got := NewVersionNotice(context.Background(), "v0.1.6"); got != nil {
+		t.Fatalf("a draft is not out yet, got %q", got)
+	}
+}
+
+func TestNewVersionNoticeIsEmptyWhenGitHubFails(t *testing.T) {
 	useFakeGitHub(t, http.StatusInternalServerError, "")
-	if got := NewVersionLine(context.Background(), "v0.1.6"); got != "" {
+	if got := NewVersionNotice(context.Background(), "v0.1.6"); got != nil {
 		t.Fatalf("a failed request should print nothing, got %q", got)
 	}
 }

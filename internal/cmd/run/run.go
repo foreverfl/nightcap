@@ -102,8 +102,8 @@ func Run(args []string, version string, stdout io.Writer) (runErr error) {
 	}
 	defer runLogFile.Close()
 	stdout = io.MultiWriter(stdout, runLogFile)
-	if newVersionLine := release.NewVersionLine(ctx, version); newVersionLine != "" {
-		fmt.Fprintln(stdout, newVersionLine)
+	for _, noticeLine := range release.NewVersionNotice(ctx, version) {
+		fmt.Fprintln(stdout, noticeLine)
 	}
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
