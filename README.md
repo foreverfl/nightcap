@@ -94,8 +94,9 @@ nightcap writes nothing into your repo but the branch. Everything else lives her
 ~/.local/share/nightcap/<repo folder>/
   state.json                                how each commit ended; nightcap clean removes it
   runs/261111/231635/                       one folder per nightcap run, named by when it started
+    run.log                                 the lines the run printed; read this one in the morning
     events.jsonl                            what happened and when, one JSON line each
-    <slug>/commit1-round1.log               claude's raw output for one round of one commit
+    <slug>/commit1-round1.jsonl             claude's raw output for one round of one commit
 ~/.cache/nightcap/<repo folder>/worktrees/<slug>   the worktree a PR is built in; nightcap clean removes it
 ```
 

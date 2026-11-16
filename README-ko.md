@@ -94,8 +94,9 @@ nightcap은 대상 레포에 브랜치 말고 아무것도 쓰지 않는다. 나
 ~/.local/share/nightcap/<레포 폴더 이름>/
   state.json                                커밋마다 어떻게 끝났나. nightcap clean이 지운다
   runs/261111/231635/                       nightcap run 한 번에 폴더 하나, 시작 시각이 이름
+    run.log                                 실행이 화면에 찍은 줄. 아침에 읽는 것은 이 파일
     events.jsonl                            언제 무슨 일이 있었나, 한 줄에 JSON 하나
-    <slug>/commit1-round1.log               커밋 하나의 한 바퀴에서 claude가 낸 원본
+    <slug>/commit1-round1.jsonl             커밋 하나의 한 바퀴에서 claude가 낸 원본
 ~/.cache/nightcap/<레포 폴더 이름>/worktrees/<slug>   PR을 만드는 worktree. nightcap clean이 지운다
 ```
 

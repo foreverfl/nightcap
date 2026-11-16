@@ -87,8 +87,9 @@ nightcap は対象リポジトリにブランチ以外何も書かない。そ�
 ~/.local/share/nightcap/<リポジトリのフォルダ名>/
   state.json                                コミットごとの結果。nightcap clean が消す
   runs/261111/231635/                       nightcap run 1 回につき 1 フォルダ、開始時刻が名前
+    run.log                                 実行が画面に出した行。朝に読むのはこのファイル
     events.jsonl                            いつ何が起きたか、1 行に JSON 1 つ
-    <slug>/commit1-round1.log               コミット 1 つの 1 ラウンドで claude が出した生の出力
+    <slug>/commit1-round1.jsonl             コミット 1 つの 1 ラウンドで claude が出した生の出力
 ~/.cache/nightcap/<リポジトリのフォルダ名>/worktrees/<slug>   PR を作る worktree。nightcap clean が消す
 ```
 

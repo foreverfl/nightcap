@@ -91,6 +91,15 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	var pickedPRs []plan.PR // the PRs tonight took, top to bottom
 	// one folder per run, named by its start: ~/.local/share/nightcap/blog-v2/runs/261108/225500/events.jsonl
 	runPath := filepath.Join(dataDir, "runs", started.Format("060102"), started.Format("150405"), "events.jsonl")
+	if err := os.MkdirAll(filepath.Dir(runPath), 0o755); err != nil {
+		return err
+	}
+	runLogFile, err := os.OpenFile(filepath.Join(filepath.Dir(runPath), "run.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer runLogFile.Close()
+	stdout = io.MultiWriter(stdout, runLogFile)
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
 		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPRs, started, startUsage)
@@ -270,7 +279,7 @@ func runCommit(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 	appendEvent(nightRun.runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: commit.Title})
 	for round := 1; round <= nightRun.loaded.MaxRounds; round++ {
 		record.Attempts = round
-		logPath := filepath.Join(filepath.Dir(nightRun.runPath), slug, fmt.Sprintf("commit%d-round%d.log", number, round))
+		logPath := filepath.Join(filepath.Dir(nightRun.runPath), slug, fmt.Sprintf("commit%d-round%d.jsonl", number, round))
 		roundStarted := time.Now()
 		result, err := claude.RunRound(ctx, claude.Round{
 			WorktreeDir:  worktreeDir,
