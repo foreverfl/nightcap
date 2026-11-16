@@ -18,7 +18,6 @@ import (
 	"nightcap/internal/client/pr"
 	"nightcap/internal/client/release"
 	"nightcap/internal/client/test"
-	"nightcap/internal/indent"
 	"nightcap/internal/rule/usage"
 	"nightcap/internal/rule/verdict"
 	"nightcap/internal/store/config"
@@ -26,6 +25,7 @@ import (
 	"nightcap/internal/store/path"
 	"nightcap/internal/store/plan"
 	"nightcap/internal/store/state"
+	"nightcap/internal/ui/indent"
 )
 
 // nightRunSettings holds the values one `nightcap run` reads once and keeps until it ends.
