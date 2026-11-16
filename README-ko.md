@@ -67,8 +67,6 @@ HTTP로 메모를 보고 더할 수 있게 해서, 웹 화면이 부를 곳을 �
 
 `nightcap init`이 [examples/nightcap.yml](examples/nightcap.yml)을 `~/.config/nightcap/nightcap.yml`에 쓰고, `nightcap config`가 그 파일을 연다. 이 기계에서 모든 계획이 같이 쓰는 설정만 둔다.
 
-nightcap은 대상 레포에 브랜치 말고 아무것도 쓰지 않는다. 상태와 로그는 `~/.local/share/nightcap/<레포>`, worktree는 `~/.cache/nightcap/<레포>` 밑에 생긴다. `XDG_CONFIG_HOME` · `XDG_DATA_HOME` · `XDG_CACHE_HOME`이 있으면 그 밑으로 간다.
-
 ```yaml
 work_start: "09:00"        # 비우면 출근 전 제한 없음. 적으면 이 시각 5시간 안에는 새 사용량 창을 열지 않는다
 limit_session: 80          # 5시간 창 사용량이 이 % 넘으면 새 커밋을 시작하지 않는다
@@ -85,3 +83,20 @@ merge_method: rebase       # 🤖 PR이 auto-merge되는 방식: rebase, 아니�
 ```sh
 gh repo edit <owner>/<repo> --enable-auto-merge --enable-rebase-merge
 ```
+
+### 파일 위치
+
+nightcap은 대상 레포에 브랜치 말고 아무것도 쓰지 않는다. 나머지는 전부 여기에 있다:
+
+```text
+~/.local/bin/nightcap                       실행 파일. install.sh와 nightcap update가 여기에 깐다
+~/.config/nightcap/nightcap.yml             설정. nightcap init이 만들고 nightcap config가 연다
+~/.local/share/nightcap/<레포 폴더 이름>/
+  state.json                                커밋마다 어떻게 끝났나. nightcap clean이 지운다
+  runs/261111/231635/                       nightcap run 한 번에 폴더 하나, 시작 시각이 이름
+    events.jsonl                            언제 무슨 일이 있었나, 한 줄에 JSON 하나
+    <slug>/commit1-round1.log               커밋 하나의 한 바퀴에서 claude가 낸 원본
+~/.cache/nightcap/<레포 폴더 이름>/worktrees/<slug>   PR을 만드는 worktree. nightcap clean이 지운다
+```
+
+`XDG_CONFIG_HOME` · `XDG_DATA_HOME` · `XDG_CACHE_HOME`이 있으면 설정 · 기록 · worktree 폴더가 그 밑으로 간다. 옛 버전이 기록 폴더에 남긴 `logs/`와 `runs/<날짜>/<시각>.jsonl`은 그대로 둔다.
