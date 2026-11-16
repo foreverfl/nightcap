@@ -25,7 +25,7 @@ func TestRunPrintsPickedPR(t *testing.T) {
 		"  worktree: " + filepath.Join(testsetup.RunCacheDir(t, repo), "worktrees/first"),
 		"  take  add it",
 		`    "ok"`,
-		"  ran  add it: done (log: " + filepath.Join(testsetup.RunFolder(t, repo), "first/commit1-round1.log") + ")",
+		"  ran  add it: done (log: " + filepath.Join(testsetup.RunFolder(t, repo), "first/commit1-round1.jsonl") + ")",
 		"  test: green",
 		"  added lines: 0",
 		"  verdict: green",
@@ -66,7 +66,7 @@ func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.jsonl"))
 	if len(logs) != 2 {
 		t.Fatalf("max_rounds 2 should leave 2 round logs, got %d: %v", len(logs), logs)
 	}
@@ -97,7 +97,7 @@ func TestRunMarksCommitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.jsonl"))
 	if len(logs) != 2 {
 		t.Fatalf("`false` fails the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -122,7 +122,7 @@ func TestRunMarksCommitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.log"))
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.jsonl"))
 	if len(logs) != 2 {
 		t.Fatalf("go.sum turns the verdict red the same way every round, so it should stop after 2 of the 3 rounds; got %d logs: %v", len(logs), logs)
 	}
@@ -299,8 +299,8 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	first, _ := os.ReadFile(filepath.Join(testsetup.RunFolder(t, repo), "first/commit1-round1.log"))
-	second, _ := os.ReadFile(filepath.Join(testsetup.RunFolder(t, repo), "first/commit1-round2.log"))
+	first, _ := os.ReadFile(filepath.Join(testsetup.RunFolder(t, repo), "first/commit1-round1.jsonl"))
+	second, _ := os.ReadFile(filepath.Join(testsetup.RunFolder(t, repo), "first/commit1-round2.jsonl"))
 	if strings.Contains(string(first), "--resume") || !strings.Contains(string(second), "--resume s1") {
 		t.Fatalf("round 1 should start a session and round 2 resume s1\nround 1: %s\nround 2: %s", first, second)
 	}

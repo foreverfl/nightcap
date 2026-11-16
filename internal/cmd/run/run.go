@@ -279,7 +279,7 @@ func runCommit(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 	appendEvent(nightRun.runPath, events.Event{Kind: "commit_start", At: time.Now(), PR: slug, Commit: commit.Title})
 	for round := 1; round <= nightRun.loaded.MaxRounds; round++ {
 		record.Attempts = round
-		logPath := filepath.Join(filepath.Dir(nightRun.runPath), slug, fmt.Sprintf("commit%d-round%d.log", number, round))
+		logPath := filepath.Join(filepath.Dir(nightRun.runPath), slug, fmt.Sprintf("commit%d-round%d.jsonl", number, round))
 		roundStarted := time.Now()
 		result, err := claude.RunRound(ctx, claude.Round{
 			WorktreeDir:  worktreeDir,
