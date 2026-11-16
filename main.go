@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 
 	"nightcap/internal/cmd/clean"
 	"nightcap/internal/cmd/configcmd"
@@ -13,6 +15,7 @@ import (
 	"nightcap/internal/cmd/run"
 	"nightcap/internal/cmd/status"
 	"nightcap/internal/cmd/update"
+	"nightcap/internal/ui/livescreen"
 )
 
 // exampleConfig is examples/nightcap.yml, built into the binary so nightcap init works without the repo.
@@ -39,7 +42,15 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 	var err error
 	switch args[0] {
 	case "run":
-		err = run.Run(args[1:], version, stdout)
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		if isTerminal(stdout) {
+			err = livescreen.Run(ctx, func(ctx context.Context, stdout io.Writer) error {
+				return run.Run(ctx, args[1:], version, stdout)
+			})
+		} else {
+			err = run.Run(ctx, args[1:], version, stdout)
+		}
 	case "status":
 		err = status.Run(args[1:], stdout)
 	case "lint":
@@ -63,4 +74,14 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// isTerminal reports whether output is a terminal, not a pipe, a file or a test buffer.
+func isTerminal(output io.Writer) bool {
+	file, ok := output.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }

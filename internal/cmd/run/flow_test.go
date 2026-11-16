@@ -2,6 +2,7 @@ package run
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +17,7 @@ func TestRunPrintsPickedPR(t *testing.T) {
 	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
 	testsetup.UseFakeClaude(t)
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	want := strings.Join([]string{
@@ -46,7 +47,7 @@ func TestRunWritesWhatItPrintsToRunLog(t *testing.T) {
 	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
 	testsetup.UseFakeClaude(t)
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	runLog, err := os.ReadFile(filepath.Join(testsetup.RunFolder(t, repo), "run.log"))
@@ -63,7 +64,7 @@ func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	testsetup.UseFakeClaude(t)
 	testsetup.WritePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.jsonl"))
@@ -80,7 +81,7 @@ func TestRunLogsEachRoundAndTestToTheRunFile(t *testing.T) {
 	testsetup.UseFakeClaude(t)
 	testsetup.WritePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"run_start", "commit_start", "round", "test", "round", "test", "blocked", "run_end"}
@@ -94,7 +95,7 @@ func TestRunMarksCommitBlockedWhenTheSameFailureRepeats(t *testing.T) {
 	testsetup.UseFakeClaude(t)
 	testsetup.WritePlanAndConfig(t, repo, "false", "max_rounds: 3\n")
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.jsonl"))
@@ -119,7 +120,7 @@ func TestRunMarksCommitBlockedWhenTheSameVerdictRepeats(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 	testsetup.WritePlanAndConfig(t, repo, "true", "max_rounds: 3\n")
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.jsonl"))
@@ -140,10 +141,10 @@ func TestRunTakesAPRThatEndedBlockedAgain(t *testing.T) {
 	testsetup.UseFakeClaude(t)
 	testsetup.WritePlanAndConfig(t, repo, "false", "max_rounds: 2\n")
 	var firstStdout, secondStdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &firstStdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &firstStdout); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
-	if err := Run([]string{"commit-bot.md"}, "dev", &secondStdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &secondStdout); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
 	secondRunLines := strings.Split(secondStdout.String(), "\n")
@@ -156,7 +157,7 @@ func TestRunSkipsAPRThatWasMerged(t *testing.T) {
 	testsetup.SetUpRepoWithOneCommitPlan(t)
 	testsetup.UseFakeGh(t, map[string]string{"feat/first": "MERGED"})
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	want := strings.Join([]string{
@@ -172,12 +173,12 @@ func TestRunTakesAPRThatWasClosedAgain(t *testing.T) {
 	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
 	testsetup.UseFakeClaude(t)
 	var firstStdout, secondStdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &firstStdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &firstStdout); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
 	testsetup.UseFakeGh(t, map[string]string{"feat/first": "CLOSED"})
 	testsetup.WritePlan(t, repo, "false") // a red check ends the second run before it opens a PR
-	if err := Run([]string{"commit-bot.md"}, "dev", &secondStdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &secondStdout); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
 	want := strings.Join([]string{
@@ -206,7 +207,7 @@ func TestRunStartsAClosedPRFromAFreshBranch(t *testing.T) {
 		}
 	}
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	output, err := exec.Command("git", "-C", repo, "log", "--oneline", "main..feat/first").Output()
@@ -220,7 +221,7 @@ func TestRunStartsAClosedPRFromAFreshBranch(t *testing.T) {
 
 func TestRunWithoutAPlanFileFails(t *testing.T) {
 	var stdout bytes.Buffer
-	if err := Run(nil, "dev", &stdout); err == nil || !strings.Contains(err.Error(), "run: name a plan file") {
+	if err := Run(context.Background(), nil, "dev", &stdout); err == nil || !strings.Contains(err.Error(), "run: name a plan file") {
 		t.Fatalf("want run: name a plan file, got %v", err)
 	}
 }
@@ -239,7 +240,7 @@ func TestRunWithoutProtectedInTheFrontmatterFails(t *testing.T) {
 	}
 	var stdout bytes.Buffer
 	want := "run: the plan's frontmatter needs repo, test, protected and dependencies"
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err == nil || !strings.Contains(err.Error(), want) {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("want %q, got %v", want, err)
 	}
 }
@@ -272,7 +273,7 @@ func TestRunStartsOnThePreviousPRsOpenBranch(t *testing.T) {
 	}
 	ghCallsPath := testsetup.UseFakeGh(t, map[string]string{"feat/first": "OPEN"})
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	ghCalls, err := os.ReadFile(ghCallsPath)
@@ -296,7 +297,7 @@ func TestRunResumesTheSessionOnTheSecondRound(t *testing.T) {
 	t.Setenv("NIGHTCAP_CLAUDE", fakeClaude)
 	testsetup.WritePlanAndConfig(t, repo, "echo $$; false", "max_rounds: 2\n")
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	first, _ := os.ReadFile(filepath.Join(testsetup.RunFolder(t, repo), "first/commit1-round1.jsonl"))
@@ -325,7 +326,7 @@ func TestRunRunsEveryOpenCommitOfThePR(t *testing.T) {
 	}
 	planFile.Close()
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	if ran := strings.Count(stdout.String(), "  ran  "); ran != 2 {
@@ -345,10 +346,10 @@ func TestRunDoesNotRunACommitThatIsAlreadyGreen(t *testing.T) {
 	testsetup.SetUpRepoWithOneCommitPlan(t)
 	testsetup.UseFakeClaude(t)
 	var firstStdout, secondStdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &firstStdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &firstStdout); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
-	if err := Run([]string{"commit-bot.md"}, "dev", &secondStdout); err != nil {
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &secondStdout); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
 	if strings.Contains(secondStdout.String(), "  ran  ") {
@@ -363,7 +364,7 @@ func TestRunTakesThePRBelowOnceThePRAboveIsDone(t *testing.T) {
 	testsetup.AppendToPlan(t, "## 📄 feat: second (second)", "", "- [ ] show it", "  - DONE  go test passes")
 
 	var stdout bytes.Buffer
-	if err := Run([]string{"commit-bot.md"}, "dev", &stdout); err != nil { // one run: first, then second
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil { // one run: first, then second
 		t.Fatal(err)
 	}
 

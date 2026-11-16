@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"nightcap/internal/indent"
+	"nightcap/internal/ui/indent"
 )
 
 // Round is what one `claude -p` round needs.
