@@ -67,8 +67,6 @@ How a `protected` or `dependencies` pattern matches a file:
 
 `nightcap init` writes [examples/nightcap.yml](examples/nightcap.yml) to `~/.config/nightcap/nightcap.yml`, and `nightcap config` opens it. It holds the settings every plan shares on this machine.
 
-nightcap writes nothing into your repo but the branch: state and logs go under `~/.local/share/nightcap/<repo>`, worktrees under `~/.cache/nightcap/<repo>`. `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` move them when set.
-
 ```yaml
 work_start: "09:00"        # leave empty for no before-work limit; when set, no new usage window opens within 5h of it
 limit_session: 80          # no new commit starts while the 5h window is above this %
@@ -85,3 +83,20 @@ Before the first 🤖 PR, turn auto-merge on in the repo once. With `merge_metho
 ```sh
 gh repo edit <owner>/<repo> --enable-auto-merge --enable-rebase-merge
 ```
+
+### Files
+
+nightcap writes nothing into your repo but the branch. Everything else lives here:
+
+```text
+~/.local/bin/nightcap                       the binary; install.sh and nightcap update put it here
+~/.config/nightcap/nightcap.yml             settings; nightcap init writes it, nightcap config opens it
+~/.local/share/nightcap/<repo folder>/
+  state.json                                how each commit ended; nightcap clean removes it
+  runs/261111/231635/                       one folder per nightcap run, named by when it started
+    events.jsonl                            what happened and when, one JSON line each
+    <slug>/commit1-round1.log               claude's raw output for one round of one commit
+~/.cache/nightcap/<repo folder>/worktrees/<slug>   the worktree a PR is built in; nightcap clean removes it
+```
+
+`XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME` move the config, data and cache folders when set. Older versions left `logs/` and `runs/<date>/<time>.jsonl` in the data folder; nightcap leaves them as they are.

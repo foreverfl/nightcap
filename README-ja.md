@@ -60,8 +60,6 @@ Notes can be listed and added over HTTP, so the web page has something to call.
 
 `nightcap init` が [examples/nightcap.yml](examples/nightcap.yml) を `~/.config/nightcap/nightcap.yml` に書き、`nightcap config` がそのファイルを開く。このマシンのすべての計画が共有する設定だけを置く。
 
-nightcap は対象リポジトリにブランチ以外何も書かない。状態とログは `~/.local/share/nightcap/<リポジトリ>`、worktree は `~/.cache/nightcap/<リポジトリ>` の下にできる。`XDG_CONFIG_HOME` · `XDG_DATA_HOME` · `XDG_CACHE_HOME` があればその下に置く。
-
 ```yaml
 work_start: "09:00"        # 空なら出勤前の制限なし。書くと、この時刻の 5 時間以内には新しい使用量ウィンドウを開かない
 limit_session: 80          # 5 時間ウィンドウの使用量がこの % を超えると、新しいコミットを始めない
@@ -78,3 +76,20 @@ merge_method: rebase       # 🤖 PR の auto-merge の方法: rebase、それ�
 ```sh
 gh repo edit <owner>/<repo> --enable-auto-merge --enable-rebase-merge
 ```
+
+### ファイルの場所
+
+nightcap は対象リポジトリにブランチ以外何も書かない。それ以外はすべてここにある:
+
+```text
+~/.local/bin/nightcap                       実行ファイル。install.sh と nightcap update がここに置く
+~/.config/nightcap/nightcap.yml             設定。nightcap init が作り、nightcap config が開く
+~/.local/share/nightcap/<リポジトリのフォルダ名>/
+  state.json                                コミットごとの結果。nightcap clean が消す
+  runs/261111/231635/                       nightcap run 1 回につき 1 フォルダ、開始時刻が名前
+    events.jsonl                            いつ何が起きたか、1 行に JSON 1 つ
+    <slug>/commit1-round1.log               コミット 1 つの 1 ラウンドで claude が出した生の出力
+~/.cache/nightcap/<リポジトリのフォルダ名>/worktrees/<slug>   PR を作る worktree。nightcap clean が消す
+```
+
+`XDG_CONFIG_HOME` · `XDG_DATA_HOME` · `XDG_CACHE_HOME` があれば、設定・記録・worktree のフォルダはその下に置く。旧バージョンが記録フォルダに残した `logs/` と `runs/<日付>/<時刻>.jsonl` はそのまま残す。

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Event is one line of a run file under .nightcap/runs: something that happened during that nightcap run.
+// Event is one line of a run's runs/<date>/<start time>/events.jsonl: something that happened during that nightcap run.
 type Event struct {
 	Kind      string    `json:"kind"` // run_start, run_end, commit_start, round, test, verdict, blocked or pr_open
 	At        time.Time `json:"at"`
