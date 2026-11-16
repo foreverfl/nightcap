@@ -133,14 +133,20 @@ func UseFakeGh(t *testing.T, prStates map[string]string) string {
 	return callsPath
 }
 
-// RunFileKinds reads the one run file a run left under repo's data folder and returns the kind of each line in order.
+// RunFolder returns the one runs/<date>/<start time> folder a run left under repo's data folder.
+func RunFolder(t *testing.T, repo string) string {
+	t.Helper()
+	runFolders, _ := filepath.Glob(filepath.Join(RunDataDir(t, repo), "runs/*/*"))
+	if len(runFolders) != 1 {
+		t.Fatalf("one run should leave one run folder, got %v", runFolders)
+	}
+	return runFolders[0]
+}
+
+// RunFileKinds reads the events.jsonl a run left in its run folder and returns the kind of each line in order.
 func RunFileKinds(t *testing.T, repo string) []string {
 	t.Helper()
-	runFiles, _ := filepath.Glob(filepath.Join(RunDataDir(t, repo), "runs/*/*/events.jsonl"))
-	if len(runFiles) != 1 {
-		t.Fatalf("one run should leave one run file, got %v", runFiles)
-	}
-	text, err := os.ReadFile(runFiles[0])
+	text, err := os.ReadFile(filepath.Join(RunFolder(t, repo), "events.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
