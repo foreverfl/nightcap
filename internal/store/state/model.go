@@ -2,9 +2,9 @@ package state
 
 import "time"
 
-// State is .nightcap/state.json: what happened to each PR nightcap took, keyed by the PR's slug.
+// State is .nightcap/state.json: what happened to each PR nightcap took.
 type State struct {
-	PRs map[string]PR `json:"prs"`
+	PRs map[string]PR `json:"prs"` // keyed by the PR's slug, e.g. "first"
 }
 
 // PR is one PR as gh last reported it and how each of its commits ended, keyed by the commit's title.

@@ -43,8 +43,11 @@ func WorktreeBranch(worktreeDir string) (string, error) {
 	return strings.TrimSpace(branch), err
 }
 
-// DeleteBranch deletes the local branch in repo, unpushed commits included.
+// DeleteBranch deletes the local branch in repo, unpushed commits included; a branch that is not there is left alone.
 func DeleteBranch(repo, branch string) error {
+	if !branchExists(repo, branch) {
+		return nil
+	}
 	_, err := runGit(repo, "branch", "-D", branch)
 	return err
 }
