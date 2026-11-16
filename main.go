@@ -39,7 +39,11 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 	var err error
 	switch args[0] {
 	case "run":
-		err = run.Run(args[1:], version, stdout)
+		if isTerminal(stdout) {
+			err = run.RunOnLiveScreen(args[1:], version)
+		} else {
+			err = run.Run(args[1:], version, stdout)
+		}
 	case "status":
 		err = status.Run(args[1:], stdout)
 	case "lint":
@@ -63,4 +67,14 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// isTerminal reports whether output is a terminal, not a pipe, a file or a test buffer.
+func isTerminal(output io.Writer) bool {
+	file, ok := output.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
