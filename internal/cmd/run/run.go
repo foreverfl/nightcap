@@ -91,6 +91,15 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	var pickedPRs []plan.PR // the PRs tonight took, top to bottom
 	// one folder per run, named by its start: ~/.local/share/nightcap/blog-v2/runs/261108/225500/events.jsonl
 	runPath := filepath.Join(dataDir, "runs", started.Format("060102"), started.Format("150405"), "events.jsonl")
+	if err := os.MkdirAll(filepath.Dir(runPath), 0o755); err != nil {
+		return err
+	}
+	runLogFile, err := os.OpenFile(filepath.Join(filepath.Dir(runPath), "run.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer runLogFile.Close()
+	stdout = io.MultiWriter(stdout, runLogFile)
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
 		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPRs, started, startUsage)

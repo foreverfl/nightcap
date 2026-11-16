@@ -42,6 +42,22 @@ func TestRunPrintsPickedPR(t *testing.T) {
 	}
 }
 
+func TestRunWritesWhatItPrintsToRunLog(t *testing.T) {
+	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	var stdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &stdout); err != nil {
+		t.Fatal(err)
+	}
+	runLog, err := os.ReadFile(filepath.Join(testsetup.RunFolder(t, repo), "run.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(runLog) != stdout.String() {
+		t.Fatalf("run.log should hold what the run printed\nrun.log: %q\nstdout:  %q", runLog, stdout.String())
+	}
+}
+
 func TestRunMarksCommitBlockedAfterMaxRounds(t *testing.T) {
 	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
 	testsetup.UseFakeClaude(t)
