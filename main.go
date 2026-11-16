@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 
 	"nightcap/internal/cmd/clean"
 	"nightcap/internal/cmd/configcmd"
@@ -39,10 +41,12 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 	var err error
 	switch args[0] {
 	case "run":
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
 		if isTerminal(stdout) {
-			err = run.RunOnLiveScreen(args[1:], version)
+			err = run.RunOnLiveScreen(ctx, args[1:], version)
 		} else {
-			err = run.Run(args[1:], version, stdout)
+			err = run.Run(ctx, args[1:], version, stdout)
 		}
 	case "status":
 		err = status.Run(args[1:], stdout)

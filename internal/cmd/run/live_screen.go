@@ -2,6 +2,8 @@ package run
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -20,21 +22,22 @@ type liveScreen struct {
 	started time.Time
 	now     time.Time
 	lines   []string
+	stopRun context.CancelFunc // cancels Run's context when Ctrl+C is pressed on the screen
 }
 
-// RunOnLiveScreen runs Run with its lines drawn on a Bubble Tea screen, and returns Run's error once the screen closes.
-func RunOnLiveScreen(args []string, version string) error {
+// RunOnLiveScreen runs Run with its lines drawn on a Bubble Tea screen, and returns Run's error once both have ended.
+func RunOnLiveScreen(ctx context.Context, args []string, version string) error {
+	ctx, stopRun := context.WithCancel(ctx)
+	defer stopRun()
 	started := time.Now()
-	program := tea.NewProgram(liveScreen{started: started, now: started})
-	var runErr error
+	program := tea.NewProgram(liveScreen{started: started, now: started, stopRun: stopRun})
+	runErr := make(chan error, 1)
 	go func() {
-		runErr = Run(args, version, &lineSender{program: program})
+		runErr <- Run(ctx, args, version, &lineSender{program: program})
 		program.Quit()
 	}()
-	if _, err := program.Run(); err != nil {
-		return err
-	}
-	return runErr
+	_, screenErr := program.Run()
+	return errors.Join(<-runErr, screenErr)
 }
 
 func (screen liveScreen) Init() tea.Cmd {
@@ -48,6 +51,11 @@ func (screen liveScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case elapsedTickMsg:
 		screen.now = time.Time(msg)
 		return screen, tickEverySecond()
+	case tea.KeyPressMsg:
+		if msg.String() == "ctrl+c" {
+			screen.stopRun()
+			return screen, tea.Quit
+		}
 	}
 	return screen, nil
 }

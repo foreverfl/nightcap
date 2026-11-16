@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -39,8 +38,9 @@ type nightRunSettings struct {
 
 // Run goes down the plan file args[0] PR by PR, running every open commit in a worktree of the frontmatter's repo, until nothing is left or a commit is not accepted.
 // version is this binary's release tag; a newer one on GitHub gets one line before the work starts.
+// Cancelling ctx stops claude and the test where they are; the run then ends as it does on Ctrl+C.
 // It fails when no plan file is named or the frontmatter leaves a key out, and when the config, git, claude or sh fails.
-func Run(args []string, version string, stdout io.Writer) (runErr error) {
+func Run(ctx context.Context, args []string, version string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
 		return errors.New("run: name a plan file")
 	}
@@ -65,8 +65,6 @@ func Run(args []string, version string, stdout io.Writer) (runErr error) {
 	if err != nil {
 		return err
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
 	if loaded.AppID != 0 && loaded.AppKey != "" {
 		jwt, err := ghapp.JWT(loaded.AppID, loaded.AppKey)
 		if err != nil {

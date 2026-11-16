@@ -22,3 +22,12 @@ func TestLiveScreenDrawsTheLinesItGotThenTheElapsedTime(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestLiveScreenStopsTheRunOnCtrlC(t *testing.T) {
+	stopCalls := 0
+	var screen tea.Model = liveScreen{stopRun: func() { stopCalls++ }}
+	screen.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	if stopCalls != 1 {
+		t.Fatalf("Ctrl+C should cancel the run once, got %d", stopCalls)
+	}
+}
