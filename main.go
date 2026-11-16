@@ -39,7 +39,7 @@ func dispatch(args []string, stdout, stderr io.Writer) int {
 	var err error
 	switch args[0] {
 	case "run":
-		err = run.Run(args[1:], stdout)
+		err = run.Run(args[1:], version, stdout)
 	case "status":
 		err = status.Run(args[1:], stdout)
 	case "lint":

@@ -17,6 +17,7 @@ import (
 	"nightcap/internal/client/git"
 	"nightcap/internal/client/notify"
 	"nightcap/internal/client/pr"
+	"nightcap/internal/client/release"
 	"nightcap/internal/client/test"
 	"nightcap/internal/indent"
 	"nightcap/internal/rule/usage"
@@ -37,8 +38,9 @@ type nightRunSettings struct {
 }
 
 // Run goes down the plan file args[0] PR by PR, running every open commit in a worktree of the frontmatter's repo, until nothing is left or a commit is not accepted.
+// version is this binary's release tag; a newer one on GitHub gets one line before the work starts.
 // It fails when no plan file is named or the frontmatter leaves a key out, and when the config, git, claude or sh fails.
-func Run(args []string, stdout io.Writer) (runErr error) {
+func Run(args []string, version string, stdout io.Writer) (runErr error) {
 	if len(args) == 0 {
 		return errors.New("run: name a plan file")
 	}
@@ -100,6 +102,9 @@ func Run(args []string, stdout io.Writer) (runErr error) {
 	}
 	defer runLogFile.Close()
 	stdout = io.MultiWriter(stdout, runLogFile)
+	if newVersionLine := release.NewVersionLine(ctx, version); newVersionLine != "" {
+		fmt.Fprintln(stdout, newVersionLine)
+	}
 	appendEvent(runPath, events.Event{Kind: "run_start", At: started})
 	defer func() {
 		sendNightSummary(ctx, loaded, meta.Repo, statePath, pickedPRs, started, startUsage)
