@@ -65,6 +65,16 @@ func SaveCommit(path, prSlug, commitTitle string, commit Commit) error {
 	return Save(path, current)
 }
 
+// ForgetPR drops everything recorded for the PR prSlug, so the next pass takes all its commits again.
+func ForgetPR(path, prSlug string) error {
+	current, err := Load(path)
+	if err != nil {
+		return err
+	}
+	delete(current.PRs, prSlug)
+	return Save(path, current)
+}
+
 // SavePRStatus notes the PR URL and state gh reported for the PR prSlug, keeping the rest of the state file.
 func SavePRStatus(path, prSlug, prURL, prState string) error {
 	current, err := Load(path)

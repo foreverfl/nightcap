@@ -152,6 +152,29 @@ func TestRunSkipsAPRThatWasMerged(t *testing.T) {
 	}
 }
 
+func TestRunTakesAPRThatWasClosedAgain(t *testing.T) {
+	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	var firstStdout, secondStdout bytes.Buffer
+	if err := Run([]string{"commit-bot.md"}, &firstStdout); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	testsetup.UseFakeGh(t, map[string]string{"feat/first": "CLOSED"})
+	testsetup.WritePlan(t, repo, "false") // a red check ends the second run before it opens a PR
+	if err := Run([]string{"commit-bot.md"}, &secondStdout); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	want := strings.Join([]string{
+		"removed worktree first: PR closed",
+		"redo first: PR closed",
+		"commit-bot.md",
+		"  branch: feat/first",
+	}, "\n") + "\n"
+	if !strings.HasPrefix(secondStdout.String(), want) {
+		t.Fatalf("a PR that was closed should be taken again, got %q", secondStdout.String())
+	}
+}
+
 func TestRunWithoutAPlanFileFails(t *testing.T) {
 	var stdout bytes.Buffer
 	if err := Run(nil, &stdout); err == nil || !strings.Contains(err.Error(), "run: name a plan file") {
