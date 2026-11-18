@@ -6,3 +6,5 @@ max_rounds: 3
 webhook: https://discord.com/api/webhooks/…   # Discord or Slack (hooks.slack.com); one message when the night ends, empty for none
 lang: [en, ko]             # PR body languages, default [ko]
 merge_method: rebase       # how a 🤖 PR auto-merges: rebase, otherwise merge. default merge
+# author_name: "nightcap/<your GitHub id>"                           # name on night commits, shown in git blame; set together with author_email
+# author_email: "<bot id>+<app name>[bot]@users.noreply.github.com"  # the bot id: gh api 'users/<app name>[bot]' --jq .id
