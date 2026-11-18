@@ -76,7 +76,11 @@ max_rounds: 3
 webhook: https://discord.com/api/webhooks/…   # Discord or Slack (hooks.slack.com); one message when the night ends, empty for none
 lang: [en, ko]             # PR body languages, default [ko]
 merge_method: rebase       # how a 🤖 PR auto-merges: rebase, otherwise merge. default merge
+# author_name: "nightcap/<your GitHub id>"                           # name on night commits, shown in git blame; set together with author_email
+# author_email: "<bot id>+<app name>[bot]@users.noreply.github.com"  # the bot id: gh api 'users/<app name>[bot]' --jq .id
 ```
+
+`author_name` and `author_email` set who the night commits are by. With `nightcap/<your GitHub id>` as the name, `git blame` and the editor show who ran the night, while the bot's email keeps the commits the bot's on GitHub. Set both or neither: with only one, both are ignored and the commits use your gitconfig.
 
 Before the first 🤖 PR, turn auto-merge on in the repo once. With `merge_method: rebase`, allow rebase merges too:
 

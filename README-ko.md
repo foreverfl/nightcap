@@ -76,7 +76,11 @@ max_rounds: 3
 webhook: https://discord.com/api/webhooks/…   # Discord나 Slack(hooks.slack.com). 밤이 끝나면 메시지 하나, 비우면 안 보낸다
 lang: [en, ko]             # PR 본문 언어, 기본 [ko]
 merge_method: rebase       # 🤖 PR이 auto-merge되는 방식: rebase, 아니면 merge. 기본 merge
+# author_name: "nightcap/<내 GitHub 아이디>"                         # 밤 커밋의 작성자 이름, git blame에 보인다. author_email과 같이 적는다
+# author_email: "<봇 ID>+<앱 이름>[bot]@users.noreply.github.com"   # 봇 ID: gh api 'users/<앱 이름>[bot]' --jq .id
 ```
+
+`author_name`과 `author_email`은 밤 커밋의 작성자를 정한다. 이름을 `nightcap/<내 GitHub 아이디>`로 적으면 `git blame`과 에디터에 밤에 돌린 사람이 보인다. 이메일은 봇 것을 쓰므로 GitHub에서는 계속 봇의 커밋이다. 둘 다 적거나 둘 다 비운다. 하나만 적으면 둘 다 무시되고 gitconfig의 작성자가 쓰인다.
 
 첫 🤖 PR 전에 레포에서 auto-merge를 한 번 켠다. `merge_method: rebase`면 rebase 머지도 같이 허용한다:
 

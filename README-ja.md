@@ -69,7 +69,11 @@ max_rounds: 3
 webhook: https://discord.com/api/webhooks/…   # Discord か Slack（hooks.slack.com）。夜が終わるとメッセージを一つ、空なら送らない
 lang: [en, ko]             # PR 本文の言語、既定は [ko]
 merge_method: rebase       # 🤖 PR の auto-merge の方法: rebase、それ以外は merge。既定は merge
+# author_name: "nightcap/<自分の GitHub ID>"                         # 夜のコミットの作成者名、git blame に出る。author_email と一緒に書く
+# author_email: "<ボット ID>+<アプリ名>[bot]@users.noreply.github.com"  # ボット ID: gh api 'users/<アプリ名>[bot]' --jq .id
 ```
+
+`author_name` と `author_email` は夜のコミットの作成者を決める。名前を `nightcap/<自分の GitHub ID>` にすると、`git blame` とエディタに夜に回した人が出る。メールはボットのものを使うので、GitHub では引き続きボットのコミットになる。両方書くか、両方空にする。片方だけだと両方無視され、gitconfig の作成者が使われる。
 
 最初の 🤖 PR の前に、リポジトリで auto-merge を一度オンにする。`merge_method: rebase` なら rebase マージも許可する:
 
