@@ -43,6 +43,41 @@ func TestRunPrintsPickedPR(t *testing.T) {
 	}
 }
 
+func TestRunSkipsAUnitWhoseAreaHasNoTestCommand(t *testing.T) {
+	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
+	testsetup.UseFakeClaude(t)
+	planText := strings.Join([]string{
+		"---",
+		"repo: " + repo,
+		"test:",
+		"  back: \"true\"",
+		`protected: ["*_test.go"]`,
+		"dependencies: [go.mod, go.sum]",
+		"---",
+		"",
+		"## 📄 feat: first (first)",
+		"",
+		"- [ ] [first/sql] make the table",
+		"  - DONE  go test passes",
+		"- [ ] [first/back] add the route",
+		"  - DONE  go test passes",
+	}, "\n") + "\n"
+	if err := os.WriteFile("commit-bot.md", []byte(planText), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	if err := Run(context.Background(), []string{"commit-bot.md"}, "dev", &stdout); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "  skip  make the table: no test command for area sql\n") {
+		t.Fatalf("stdout should skip the sql unit, got %q", stdout.String())
+	}
+	logs, _ := filepath.Glob(filepath.Join(testsetup.RunFolder(t, repo), "first/*.jsonl"))
+	if len(logs) != 1 || filepath.Base(logs[0]) != "commit2-round1.jsonl" {
+		t.Fatalf("claude should run only the back unit, got %v", logs)
+	}
+}
+
 func TestRunWritesWhatItPrintsToRunLog(t *testing.T) {
 	repo := testsetup.SetUpRepoWithOneCommitPlan(t)
 	testsetup.UseFakeClaude(t)
