@@ -12,9 +12,9 @@ var riskWords = []struct {
 	label string
 	words []string
 }{
-	{"env", []string{"os.Getenv", "env::var", "process.env"}},
-	{"network", []string{"http.Get", "http.Post", "http.NewRequest", "net.Dial", "reqwest::", "fetch("}},
-	{"delete", []string{"os.Remove", "DELETE FROM", "DROP TABLE", "rm -rf"}},
+	{"환경 변수 읽음", []string{"os.Getenv", "env::var", "process.env"}},
+	{"네트워크 호출", []string{"http.Get", "http.Post", "http.NewRequest", "net.Dial", "reqwest::", "fetch("}},
+	{"삭제", []string{"os.Remove", "DELETE FROM", "DROP TABLE", "rm -rf"}},
 }
 
 var signatureStarts = []string{"func ", "pub fn "}
@@ -34,15 +34,15 @@ func RiskLines(changes []git.Change, addedLines []git.AddedLine) []string {
 			}
 		}
 		if slices.ContainsFunc(signatureStarts, func(start string) bool { return strings.HasPrefix(text, start) }) {
-			risks = append(risks, "func: "+line.Path+": "+text)
+			risks = append(risks, "새 함수: "+line.Path+": "+text)
 		}
 		if containsAny(text, routeMarks) {
-			risks = append(risks, "route: "+line.Path+": "+text)
+			risks = append(risks, "새 라우트: "+line.Path+": "+text)
 		}
 	}
 	for _, change := range changes {
 		if strings.HasSuffix(change.Path, ".sql") {
-			risks = append(risks, "sql: "+change.Path)
+			risks = append(risks, "SQL 파일: "+change.Path)
 		}
 	}
 	return risks

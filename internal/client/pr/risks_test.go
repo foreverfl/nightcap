@@ -9,7 +9,7 @@ import (
 
 func TestRiskLinesNameTheFileThatReadsEnv(t *testing.T) {
 	added := []git.AddedLine{{Path: "internal/feed/client.go", Text: `	apiKey := os.Getenv("FEED_API_KEY")`}}
-	want := []string{"env: internal/feed/client.go"}
+	want := []string{"환경 변수 읽음: internal/feed/client.go"}
 	if risks := RiskLines(nil, added); !slices.Equal(risks, want) {
 		t.Fatalf("want %q, got %q", want, risks)
 	}

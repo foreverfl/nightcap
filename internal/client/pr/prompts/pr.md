@@ -12,21 +12,16 @@
 
 ## Risks
 {{- if .IsMissingEnglish}}
-- no English block
+- 영어 블록 없음(번역 실패)
 {{- end}}
 {{- if .IsMissingReviewOrder}}
-- no review order
+- 읽는 순서 없음
 {{- end}}
-{{- range .Commits}}
-  {{- if .ReadCodeReason}}
-- {{.ReadCodeReason}}
-  {{- end}}
-{{- end}}
-{{- range .Risks}}
+{{- range .UniqueRisks}}
 - {{.}}
 {{- end}}
 {{- if .HasNoRisk}}
-- none
+- 없음
 {{- end}}
 
 ## Verified

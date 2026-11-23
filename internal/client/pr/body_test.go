@@ -27,7 +27,7 @@ func TestBuildBodyListsCommitsAndTheReadCodeReason(t *testing.T) {
 		"- 피드 화면: go test . 통과",
 		"",
 		"## Risks",
-		"- outside WHERE: main.go",
+		"- WHERE 밖의 파일: main.go",
 		"",
 		"## Verified",
 		"```",
@@ -39,6 +39,25 @@ func TestBuildBodyListsCommitsAndTheReadCodeReason(t *testing.T) {
 	}
 }
 
+func TestBuildBodyListsAReasonTwoCommitsShareOnce(t *testing.T) {
+	body, err := BuildBody(BodyInput{Commits: []BodyCommit{
+		{What: "A", ReadCodeReason: "outside WHERE: model.rs"},
+		{What: "B", ReadCodeReason: "outside WHERE: model.rs"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if risk := riskSection(body); risk != "- WHERE 밖의 파일: model.rs\n" {
+		t.Fatalf("got %q, want one line", risk)
+	}
+}
+
+func TestKoreanReasonLeavesAReasonNotInTheTableAsItIs(t *testing.T) {
+	if got := koreanReason("something else: main.go"); got != "something else: main.go" {
+		t.Fatalf("got %q, want %q", got, "something else: main.go")
+	}
+}
+
 // riskSection returns the lines of body between "## Risks" and "## Verified".
 func riskSection(body string) string {
 	_, afterRisk, _ := strings.Cut(body, "## Risks\n")
@@ -47,11 +66,11 @@ func riskSection(body string) string {
 }
 
 func TestBuildBodyListsRiskLines(t *testing.T) {
-	body, err := BuildBody(BodyInput{Risks: []string{"env: internal/feed/client.go"}})
+	body, err := BuildBody(BodyInput{Risks: []string{"환경 변수 읽음: internal/feed/client.go"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if risk := riskSection(body); risk != "- env: internal/feed/client.go\n" {
+	if risk := riskSection(body); risk != "- 환경 변수 읽음: internal/feed/client.go\n" {
 		t.Fatalf("the risk section should hold the one risk line, got %q", risk)
 	}
 }
@@ -61,7 +80,7 @@ func TestBuildBodyWithNothingRiskySaysNone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if risk := riskSection(body); risk != "- none\n" {
+	if risk := riskSection(body); risk != "- 없음\n" {
 		t.Fatalf("with nothing risky the risk section should say none, got %q", risk)
 	}
 }
@@ -72,7 +91,7 @@ func TestBuildBilingualBodyWithoutTranslationSaysEnglishIsMissing(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if risk := riskSection(body); risk != "- no English block\n" {
+	if risk := riskSection(body); risk != "- 영어 블록 없음(번역 실패)\n" {
 		t.Fatalf("a failed translation should leave only no English block in the risk section, got %q", risk)
 	}
 }
@@ -98,7 +117,7 @@ func TestBuildBodyWhenClaudeFailedTheReviewOrderWarnsInTheRiskSection(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if risk := riskSection(body); risk != "- no review order\n" {
+	if risk := riskSection(body); risk != "- 읽는 순서 없음\n" {
 		t.Fatalf("a failed review order should leave only no review order in the risk section, got %q", risk)
 	}
 }
