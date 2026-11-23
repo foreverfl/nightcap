@@ -38,6 +38,24 @@ func (input BodyInput) HasNoRisk() bool {
 	return !input.IsMissingEnglish && !input.IsMissingReviewOrder && !hasReadCode && len(input.Risks) == 0
 }
 
+// UniqueRisks returns the commits' read-code reasons, then the diff's risk lines, each once, in the order they first appear.
+func (input BodyInput) UniqueRisks() []string {
+	var candidates []string
+	for _, commit := range input.Commits {
+		if commit.ReadCodeReason != "" {
+			candidates = append(candidates, commit.ReadCodeReason)
+		}
+	}
+	candidates = append(candidates, input.Risks...)
+	var unique []string
+	for _, line := range candidates {
+		if !slices.Contains(unique, line) {
+			unique = append(unique, line)
+		}
+	}
+	return unique
+}
+
 // koreanReasonStarts maps the start of a reason verdict.Classify gives to the Korean the PR body shows.
 var koreanReasonStarts = []struct{ english, korean string }{
 	{"outside WHERE: ", "WHERE 밖의 파일: "},

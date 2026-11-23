@@ -17,12 +17,7 @@
 {{- if .IsMissingReviewOrder}}
 - 읽는 순서 없음
 {{- end}}
-{{- range .Commits}}
-  {{- if .ReadCodeReason}}
-- {{.ReadCodeReason}}
-  {{- end}}
-{{- end}}
-{{- range .Risks}}
+{{- range .UniqueRisks}}
 - {{.}}
 {{- end}}
 {{- if .HasNoRisk}}

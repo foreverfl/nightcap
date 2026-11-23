@@ -39,6 +39,19 @@ func TestBuildBodyListsCommitsAndTheReadCodeReason(t *testing.T) {
 	}
 }
 
+func TestBuildBodyListsAReasonTwoCommitsShareOnce(t *testing.T) {
+	body, err := BuildBody(BodyInput{Commits: []BodyCommit{
+		{What: "A", ReadCodeReason: "outside WHERE: model.rs"},
+		{What: "B", ReadCodeReason: "outside WHERE: model.rs"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if risk := riskSection(body); risk != "- WHERE 밖의 파일: model.rs\n" {
+		t.Fatalf("got %q, want one line", risk)
+	}
+}
+
 func TestKoreanReasonLeavesAReasonNotInTheTableAsItIs(t *testing.T) {
 	if got := koreanReason("something else: main.go"); got != "something else: main.go" {
 		t.Fatalf("got %q, want %q", got, "something else: main.go")
