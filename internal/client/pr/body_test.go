@@ -27,7 +27,7 @@ func TestBuildBodyListsCommitsAndTheReadCodeReason(t *testing.T) {
 		"- 피드 화면: go test . 통과",
 		"",
 		"## Risks",
-		"- outside WHERE: main.go",
+		"- WHERE 밖의 파일: main.go",
 		"",
 		"## Verified",
 		"```",
@@ -36,6 +36,12 @@ func TestBuildBodyListsCommitsAndTheReadCodeReason(t *testing.T) {
 	}, "\n") + "\n"
 	if body != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", body, want)
+	}
+}
+
+func TestKoreanReasonLeavesAReasonNotInTheTableAsItIs(t *testing.T) {
+	if got := koreanReason("something else: main.go"); got != "something else: main.go" {
+		t.Fatalf("got %q, want %q", got, "something else: main.go")
 	}
 }
 
