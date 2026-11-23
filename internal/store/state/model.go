@@ -25,6 +25,11 @@ type Commit struct {
 	UpdatedAt    time.Time     `json:"updated_at"`
 }
 
+// IsAccepted reports whether the commit ended green or read-code, the two results a PR keeps.
+func (commit Commit) IsAccepted() bool {
+	return commit.Result == "green" || commit.Result == "read-code"
+}
+
 // UsageAtLimit is the /usage percents read right after claude hit a rate limit, to tell in the morning which limit it was.
 type UsageAtLimit struct {
 	Session   int `json:"session"`

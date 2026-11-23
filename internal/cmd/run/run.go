@@ -224,7 +224,8 @@ func runNextPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 		if !startUsage.Known {
 			*startUsage = current
 		}
-		if reason := usageStopReason(time.Now(), current, nightRun.loaded); reason != "" {
+		loaded := nightRun.loaded
+		if reason := usage.StopReason(time.Now(), current, loaded.LimitSession, loaded.LimitWeeklyAll, loaded.WorkStart); reason != "" {
 			indent.Fprintf(stdout, 1, "stop: %s\n", reason)
 			return picked, false, state.SaveCommit(nightRun.statePath, planPR.Slug, commit.Title, state.Commit{Result: "stopped", Reason: reason})
 		}
@@ -255,48 +256,17 @@ func isAccepted(statePath, slug, commitTitle string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	result := saved.PRs[slug].Commits[commitTitle].Result
-	return result == "green" || result == "read-code", nil
+	return saved.PRs[slug].Commits[commitTitle].IsAccepted(), nil
 }
 
 // isPRDone reports whether every commit of planPR that has a check ended green or read-code.
 func isPRDone(savedPR state.PR, planPR plan.PR) bool {
 	for _, commit := range planPR.Commits {
-		result := savedPR.Commits[commit.Title].Result
-		if commit.HasTest && result != "green" && result != "read-code" {
+		if commit.HasTest && !savedPR.Commits[commit.Title].IsAccepted() {
 			return false
 		}
 	}
 	return true
-}
-
-// usageStopReason says why no commit should start now under loaded's limits, or "" when one may.
-func usageStopReason(now time.Time, current usage.Usage, loaded config.Config) string {
-	// stop 1: the 5h window is already at limit_session, so this commit could hit the limit halfway
-	if current.Known && loaded.LimitSession > 0 && current.Session.Percent >= loaded.LimitSession {
-		return fmt.Sprintf("session %d%% ≥ %d", current.Session.Percent, loaded.LimitSession)
-	}
-	// stop 2: the week is at limit_weekly_all and its reset is over 24h away, so tonight would eat the weekdays' share
-	weeklyResetsSoon := current.WeeklyAll.ResetsAt.Sub(now) < 24*time.Hour
-	if current.Known && loaded.LimitWeeklyAll > 0 && !weeklyResetsSoon && current.WeeklyAll.Percent >= loaded.LimitWeeklyAll {
-		return fmt.Sprintf("weekly_all %d%% ≥ %d", current.WeeklyAll.Percent, loaded.LimitWeeklyAll)
-	}
-	// stop 3: the window would still be running at work_start, so the morning would start rate-limited
-	_, afterWork := windowReset(now, current, loaded.WorkStart)
-	return afterWork
-}
-
-// windowReset returns when the 5h window resets, and afterWork such as "reset 10:00 > work_start 09:00" when that is after work_start.
-func windowReset(now time.Time, current usage.Usage, workStartHHMM string) (reset time.Time, afterWork string) {
-	reset = now.Add(5 * time.Hour)
-	if current.Session.ResetsAt.After(now) {
-		reset = current.Session.ResetsAt
-	}
-	workStart, _ := usage.NextWorkStart(now, workStartHHMM)
-	if usage.EndsBeforeWork(reset, workStart) {
-		return reset, ""
-	}
-	return reset, fmt.Sprintf("reset %s > work_start %s", reset.In(now.Location()).Format("15:04"), workStart.Format("15:04"))
 }
 
 // appendEvent adds event to the run file; a failed write only prints to stderr, so the log never stops a run.

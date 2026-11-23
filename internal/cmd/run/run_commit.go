@@ -54,7 +54,7 @@ func runCommit(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 			if current.Known {
 				record.UsageAtLimit = &state.UsageAtLimit{Session: current.Session.Percent, WeeklyAll: current.WeeklyAll.Percent}
 			}
-			reset, afterWork := windowReset(time.Now(), current, nightRun.loaded.WorkStart)
+			reset, afterWork := usage.WindowReset(time.Now(), current, nightRun.loaded.WorkStart)
 			// the reset comes after work_start, so sleeping would carry the run into the workday
 			if afterWork != "" {
 				indent.Fprintf(stdout, 1, "stop: rate limited, %s\n", afterWork)

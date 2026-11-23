@@ -108,7 +108,7 @@ func bodyInput(planPR plan.PR, savedPR state.PR, lastCommitTitle string) pr.Body
 	input := pr.BodyInput{Summary: planPR.Summary, TestTail: savedPR.Commits[lastCommitTitle].TestTail}
 	for _, commit := range planPR.Commits {
 		record := savedPR.Commits[commit.Title]
-		if record.Result != "green" && record.Result != "read-code" {
+		if !record.IsAccepted() {
 			continue
 		}
 		bodyCommit := pr.BodyCommit{What: plan.LabelValue(commit.Body, "WHAT"), Done: plan.LabelValue(commit.Body, "DONE")}
@@ -127,8 +127,7 @@ func labelWhenFinished(ctx context.Context, stdout io.Writer, statePath, worktre
 		return err
 	}
 	for _, commit := range planPR.Commits {
-		result := saved.PRs[planPR.Slug].Commits[commit.Title].Result
-		if result != "green" && result != "read-code" {
+		if !saved.PRs[planPR.Slug].Commits[commit.Title].IsAccepted() {
 			return nil
 		}
 	}
