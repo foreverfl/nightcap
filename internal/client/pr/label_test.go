@@ -18,3 +18,15 @@ func TestReadingLabelFollowsTheMark(t *testing.T) {
 		}
 	}
 }
+
+func TestLabelColorIsGreenForAutoAndPurpleForReadPR(t *testing.T) {
+	want := map[string]string{
+		"nightcap:auto":    "0E8A16",
+		"nightcap:read-pr": "7057FF",
+	}
+	for label, color := range want {
+		if got := labelColor(label); got != color {
+			t.Errorf("%s: got %q, want %q", label, got, color)
+		}
+	}
+}
