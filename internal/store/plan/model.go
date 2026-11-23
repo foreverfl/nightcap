@@ -46,8 +46,14 @@ type Commit struct {
 
 // Meta is the plan file's frontmatter: which repo the plan runs in and how its commits are tested.
 type Meta struct {
-	Repo         string   `yaml:"repo"`         // a leading "~/" is expanded to the home folder
-	Test         string   `yaml:"test"`         // shell command that proves a commit, such as make check
-	Protected    []string `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
-	Dependencies []string `yaml:"dependencies"` // dependency file globs the agent may not touch
+	Repo         string       `yaml:"repo"`         // a leading "~/" is expanded to the home folder
+	Test         TestCommands `yaml:"test"`         // shell command that proves a commit, such as make check
+	Protected    []string     `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
+	Dependencies []string     `yaml:"dependencies"` // dependency file globs the agent may not touch
+}
+
+// TestCommands is the frontmatter's test: one command for every area, or one command per area.
+type TestCommands struct {
+	All    string            // test: make check
+	ByArea map[string]string // test: {back: cargo test, front: npm test}
 }

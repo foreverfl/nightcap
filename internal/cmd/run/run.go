@@ -54,7 +54,7 @@ func Run(ctx context.Context, args []string, version string, stdout io.Writer) (
 		return err
 	}
 	// a key left out reads as nil, while "protected: []" is an empty list that means none
-	if meta.Repo == "" || meta.Test == "" || meta.Protected == nil || meta.Dependencies == nil {
+	if meta.Repo == "" || meta.Test.IsEmpty() || meta.Protected == nil || meta.Dependencies == nil {
 		return errors.New("run: the plan's frontmatter needs repo, test, protected and dependencies")
 	}
 	configPath, err := path.ConfigFile()

@@ -68,8 +68,9 @@ func runCommit(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 		if result.Outcome != claude.Done {
 			break
 		}
-		// 1. Test: run the test command from the plan's frontmatter (pass or not)
-		tested, err := test.Run(ctx, worktreeDir, nightRun.frontmatter.Test)
+		// 1. Test: run the frontmatter's test command for this unit's area (pass or not)
+		testCommand, _ := nightRun.frontmatter.Test.CommandFor(commit.Area)
+		tested, err := test.Run(ctx, worktreeDir, testCommand)
 		if err != nil {
 			return err
 		}
