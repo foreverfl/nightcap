@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
 
+	"nightcap/internal/client/awake"
 	"nightcap/internal/client/claude"
 	"nightcap/internal/client/ghapp"
 	"nightcap/internal/client/git"
@@ -72,6 +75,12 @@ func Run(ctx context.Context, args []string, version string, stdout io.Writer) (
 			return fmt.Errorf("app: %w", err)
 		}
 		fmt.Fprintf(stdout, "app: %s\n", appName)
+	}
+	// a failed start only costs the night its sleep guard, so the run goes on
+	if keepAwake := awake.Command(runtime.GOOS, os.Getpid()); keepAwake != nil {
+		if err := exec.Command(keepAwake[0], keepAwake[1:]...).Start(); err != nil {
+			fmt.Fprintln(os.Stderr, "awake:", err)
+		}
 	}
 	started := time.Now()
 	var startUsage usage.Usage // the first /usage read before a commit, so a night that runs nothing never calls claude
