@@ -124,7 +124,7 @@ func Run(ctx context.Context, args []string, version string, stdout io.Writer) (
 	nightRun := nightRunSettings{loaded: loaded, frontmatter: meta, statePath: statePath, runPath: runPath}
 	// a PR whose commits all ended accepted lets the next pass take the PR below it
 	for {
-		picked, finished, err := runNextPR(ctx, stdout, nightRun, planPath, string(planText), worktreesDir, &startUsage)
+		picked, finished, err := runPR(ctx, stdout, nightRun, planPath, string(planText), worktreesDir, &startUsage)
 		if picked != nil {
 			pickedPRs = append(pickedPRs, *picked)
 		}
@@ -134,9 +134,9 @@ func Run(ctx context.Context, args []string, version string, stdout io.Writer) (
 	}
 }
 
-// runNextPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
+// runPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
 // picked is that PR, nil when there was none; finished is true when every commit of it ended accepted.
-func runNextPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings, planPath, planText, worktreesDir string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
+func runPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings, planPath, planText, worktreesDir string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
 	saved, err := state.Load(nightRun.statePath)
 	if err != nil {
 		return picked, false, err
