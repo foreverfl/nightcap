@@ -255,15 +255,13 @@ func isAccepted(statePath, slug, commitTitle string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	result := saved.PRs[slug].Commits[commitTitle].Result
-	return result == "green" || result == "read-code", nil
+	return saved.PRs[slug].Commits[commitTitle].IsAccepted(), nil
 }
 
 // isPRDone reports whether every commit of planPR that has a check ended green or read-code.
 func isPRDone(savedPR state.PR, planPR plan.PR) bool {
 	for _, commit := range planPR.Commits {
-		result := savedPR.Commits[commit.Title].Result
-		if commit.HasTest && result != "green" && result != "read-code" {
+		if commit.HasTest && !savedPR.Commits[commit.Title].IsAccepted() {
 			return false
 		}
 	}

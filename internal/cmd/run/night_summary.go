@@ -57,11 +57,11 @@ func prSummary(statePath string, planPR plan.PR) (notify.PR, error) {
 		URL:   savedPR.PRURL,
 	}
 	for _, commit := range planPR.Commits {
-		result := savedPR.Commits[commit.Title].Result
-		if result == "green" || result == "read-code" {
+		record := savedPR.Commits[commit.Title]
+		if record.IsAccepted() {
 			prResult.Done++
-		} else if result != "" && prResult.Failure == "" {
-			prResult.Failure = result
+		} else if record.Result != "" && prResult.Failure == "" {
+			prResult.Failure = record.Result
 		}
 	}
 	return prResult, nil
