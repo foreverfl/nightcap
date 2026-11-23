@@ -11,7 +11,7 @@ import (
 // oneLintPlan is the smallest plan lint passes: one typed PR with one commit that has a test.
 func oneLintPlan() string {
 	return "## 📄 feat: a (b)\n" +
-		"- [ ] read the docs\n" +
+		"- [ ] [blog-v2/back] read the docs\n" +
 		"  - DONE  go test ./... passes\n"
 }
 
@@ -37,6 +37,29 @@ func TestLintPlanWithoutTypedPRFails(t *testing.T) {
 func TestLintCommitWithoutTestFails(t *testing.T) {
 	err, stdout := runLint(t, strings.Replace(oneLintPlan(), "go test ./... passes", "테스트가 없음", 1))
 	want := "PR: feat: a (b)\n  no test: read the docs\n"
+	if err == nil || stdout != want {
+		t.Fatalf("want an error and %q, got %v %q", want, err, stdout)
+	}
+}
+
+func TestLintPassesACommitTaggedWithAKnownArea(t *testing.T) {
+	err, stdout := runLint(t, oneLintPlan())
+	if err != nil || stdout != "PR: feat: a (b)\n" {
+		t.Fatalf("want no error and %q, got %v %q", "PR: feat: a (b)\n", err, stdout)
+	}
+}
+
+func TestLintCommitWithoutATagFails(t *testing.T) {
+	err, stdout := runLint(t, strings.Replace(oneLintPlan(), "[blog-v2/back] ", "", 1))
+	want := "PR: feat: a (b)\n  no tag: read the docs\n"
+	if err == nil || stdout != want {
+		t.Fatalf("want an error and %q, got %v %q", want, err, stdout)
+	}
+}
+
+func TestLintCommitWithAnUnknownAreaFails(t *testing.T) {
+	err, stdout := runLint(t, strings.Replace(oneLintPlan(), "[blog-v2/back]", "[blog-v2/api]", 1))
+	want := "PR: feat: a (b)\n  unknown area api: read the docs\n"
 	if err == nil || stdout != want {
 		t.Fatalf("want an error and %q, got %v %q", want, err, stdout)
 	}

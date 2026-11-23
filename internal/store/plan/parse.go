@@ -9,6 +9,9 @@ import (
 // prTypes are the Conventional Commits types a PR may use.
 var prTypes = []string{"feat", "fix", "test", "docs", "refactor", "chore"}
 
+// Areas are the words a unit's "[repo/area]" tag may use after the slash.
+var Areas = []string{"front", "back", "cli", "sql", "infra", "config", "docs", "test", "none"}
+
 // marks maps each reading mark written before a PR's type to its Mark.
 var marks = map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👤": MarkPerson}
 
