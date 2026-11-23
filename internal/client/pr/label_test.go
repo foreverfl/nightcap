@@ -30,3 +30,15 @@ func TestLabelColorIsGreenForAutoAndPurpleForReadPR(t *testing.T) {
 		}
 	}
 }
+
+func TestLabelDescriptionSaysHowEachLabelMerges(t *testing.T) {
+	want := map[string]string{
+		"nightcap:auto":    "merges by itself once the checks pass",
+		"nightcap:read-pr": "read the PR body, then merge",
+	}
+	for label, description := range want {
+		if got := labelDescription(label); got != description {
+			t.Errorf("%s: got %q, want %q", label, got, description)
+		}
+	}
+}
