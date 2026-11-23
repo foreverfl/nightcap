@@ -39,6 +39,24 @@ func TestParseReadsCommitBody(t *testing.T) {
 	}
 }
 
+func TestParseTakesTheTagOffTheTitle(t *testing.T) {
+	text := strings.Replace(onePR(), "- [ ] add the list endpoint", "- [ ] [blog-v2/back] add GET /github/kinds", 1)
+	commit := Parse(text)[0].Commits[0]
+	if commit.Repo != "blog-v2" || commit.Area != "back" || commit.Title != "add GET /github/kinds" {
+		t.Fatalf("got %q %q %q", commit.Repo, commit.Area, commit.Title)
+	}
+	if firstLine, _, _ := strings.Cut(commit.Body, "\n"); firstLine != "- [ ] add GET /github/kinds" {
+		t.Fatalf("first body line = %q", firstLine)
+	}
+}
+
+func TestParseLeavesRepoAndAreaEmptyWithoutATag(t *testing.T) {
+	commit := Parse(onePR())[0].Commits[0]
+	if commit.Repo != "" || commit.Area != "" {
+		t.Fatalf("got %q %q, want both empty", commit.Repo, commit.Area)
+	}
+}
+
 func TestParseSkipsDoneCommits(t *testing.T) {
 	text := strings.Replace(onePR(), "- [ ]", "- [x]", 1)
 	if commits := Parse(text)[0].Commits; len(commits) != 0 {

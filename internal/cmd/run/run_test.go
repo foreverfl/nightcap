@@ -54,7 +54,7 @@ func TestRunCommitSleepsUntilTheResetAfterARateLimit(t *testing.T) {
 	statePath := filepath.Join(repo, ".nightcap", "state.json")
 	nightRun := nightRunSettings{
 		loaded:      config.Config{MaxRounds: 3},
-		frontmatter: plan.Meta{Repo: repo, Test: "true"},
+		frontmatter: plan.Meta{Repo: repo, Test: plan.TestCommands{All: "true"}},
 		statePath:   statePath,
 		runPath:     filepath.Join(repo, ".nightcap", "runs", "run.jsonl"),
 	}

@@ -54,7 +54,7 @@ func Run(ctx context.Context, args []string, version string, stdout io.Writer) (
 		return err
 	}
 	// a key left out reads as nil, while "protected: []" is an empty list that means none
-	if meta.Repo == "" || meta.Test == "" || meta.Protected == nil || meta.Dependencies == nil {
+	if meta.Repo == "" || meta.Test.IsEmpty() || meta.Protected == nil || meta.Dependencies == nil {
 		return errors.New("run: the plan's frontmatter needs repo, test, protected and dependencies")
 	}
 	configPath, err := path.ConfigFile()
@@ -124,7 +124,7 @@ func Run(ctx context.Context, args []string, version string, stdout io.Writer) (
 	nightRun := nightRunSettings{loaded: loaded, frontmatter: meta, statePath: statePath, runPath: runPath}
 	// a PR whose commits all ended accepted lets the next pass take the PR below it
 	for {
-		picked, finished, err := runNextPR(ctx, stdout, nightRun, planPath, string(planText), worktreesDir, &startUsage)
+		picked, finished, err := runPR(ctx, stdout, nightRun, planPath, string(planText), worktreesDir, &startUsage)
 		if picked != nil {
 			pickedPRs = append(pickedPRs, *picked)
 		}
@@ -134,9 +134,9 @@ func Run(ctx context.Context, args []string, version string, stdout io.Writer) (
 	}
 }
 
-// runNextPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
+// runPR takes the top PR that still has a commit to run and runs its commits until one is not accepted.
 // picked is that PR, nil when there was none; finished is true when every commit of it ended accepted.
-func runNextPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings, planPath, planText, worktreesDir string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
+func runPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings, planPath, planText, worktreesDir string, startUsage *usage.Usage) (picked *plan.PR, finished bool, err error) {
 	saved, err := state.Load(nightRun.statePath)
 	if err != nil {
 		return picked, false, err
@@ -148,6 +148,7 @@ func runNextPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 	stackBelow := map[string][]string{} // the open PRs a new PR stacks onto, bottom first
 	var openStack []string              // the open PRs right above in the plan, unbroken, bottom first
 	for _, planPR := range plan.Parse(planText) {
+		skipAreasWithoutTestCommand(planPR, nightRun.frontmatter.Test)
 		baseFor[planPR.Slug] = "main"
 		if previousOpenBranch != "" {
 			baseFor[planPR.Slug] = previousOpenBranch
@@ -213,11 +214,14 @@ func runNextPR(ctx context.Context, stdout io.Writer, nightRun nightRunSettings,
 	indent.Fprintf(stdout, 1, "branch: %s\n", branch)
 	indent.Fprintf(stdout, 1, "worktree: %s\n", worktreeDir)
 	for _, commit := range planPR.Commits {
-		mark := "skip"
+		_, hasTestCommand := nightRun.frontmatter.Test.CommandFor(commit.Area)
 		if commit.HasTest {
-			mark = "take"
+			indent.Fprintf(stdout, 1, "take  %s\n", commit.Title)
+		} else if !hasTestCommand {
+			indent.Fprintf(stdout, 1, "skip  %s: no test command for area %s\n", commit.Title, commit.Area)
+		} else {
+			indent.Fprintf(stdout, 1, "skip  %s\n", commit.Title)
 		}
-		indent.Fprintf(stdout, 1, "%s  %s\n", mark, commit.Title)
 	}
 
 	for index, commit := range planPR.Commits {
@@ -266,6 +270,16 @@ func isAccepted(statePath, slug, commitTitle string) (bool, error) {
 		return false, err
 	}
 	return saved.PRs[slug].Commits[commitTitle].IsAccepted(), nil
+}
+
+// skipAreasWithoutTestCommand turns HasTest off for every commit of planPR whose area test: names no command for,
+// so picking, running and isPRDone pass over it the same way they pass over a commit without a check.
+func skipAreasWithoutTestCommand(planPR plan.PR, commands plan.TestCommands) {
+	for i, commit := range planPR.Commits {
+		if _, hasTestCommand := commands.CommandFor(commit.Area); !hasTestCommand {
+			planPR.Commits[i].HasTest = false
+		}
+	}
 }
 
 // isPRDone reports whether every commit of planPR that has a check ended green or read-code.

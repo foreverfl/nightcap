@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -26,7 +27,7 @@ func TestParseMetaReadsTheFrontmatter(t *testing.T) {
 	meta, err := ParseMeta(withFrontmatter)
 	want := Meta{
 		Repo:         filepath.Join(home, "workspace/apps-web/blog-v2"),
-		Test:         "make check",
+		Test:         TestCommands{All: "make check"},
 		Protected:    []string{"*.tsp", "*_test.go"},
 		Dependencies: []string{"go.mod", "go.sum"},
 	}
@@ -35,6 +36,32 @@ func TestParseMetaReadsTheFrontmatter(t *testing.T) {
 	}
 	if planPRs := Parse(withFrontmatter); len(planPRs) != 1 || planPRs[0].Slug != "feed" {
 		t.Fatalf("the frontmatter should leave the PRs as they were, got %+v", planPRs)
+	}
+}
+
+func TestCommandForGivesTheOneCommandToEveryArea(t *testing.T) {
+	commands := TestCommands{All: "go test ./..."}
+	if command, ok := commands.CommandFor("front"); !ok || command != "go test ./..." {
+		t.Fatalf("got %q %v, want go test ./... true", command, ok)
+	}
+}
+
+func TestCommandForPicksTheAreasCommandFromAList(t *testing.T) {
+	frontmatter := strings.Join([]string{
+		"---",
+		"test:",
+		"  back: cargo test",
+		"---",
+	}, "\n") + "\n"
+	meta, err := ParseMeta(frontmatter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command, ok := meta.Test.CommandFor("back"); !ok || command != "cargo test" {
+		t.Fatalf("back: got %q %v, want cargo test true", command, ok)
+	}
+	if command, ok := meta.Test.CommandFor("front"); ok {
+		t.Fatalf("front: got %q, want none", command)
 	}
 }
 

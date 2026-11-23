@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"nightcap/internal/rule/verdict"
 	"nightcap/internal/store/plan"
 )
 
-// Run prints what in the plan file args[0] a night run cannot use: 👤 PRs, PRs without a mark, commits without a test and unreadable WHERE paths.
+// Run prints what in the plan file args[0] a night run cannot use: 👤 PRs, PRs without a mark, commits without a test,
+// commits without a "[repo/area]" tag or with an area not in plan.Areas, and unreadable WHERE paths.
 // It fails when it finds any of those or cannot read the file.
 func Run(args []string, stdout io.Writer) error {
 	if len(args) == 0 {
@@ -41,6 +43,13 @@ func Run(args []string, stdout io.Writer) error {
 		for _, commit := range planPR.Commits {
 			if !commit.HasTest {
 				fmt.Fprintf(stdout, "  no test: %s\n", commit.Title)
+				hasProblem = true
+			}
+			if commit.Area == "" {
+				fmt.Fprintf(stdout, "  no tag: %s\n", commit.Title)
+				hasProblem = true
+			} else if !slices.Contains(plan.Areas, commit.Area) {
+				fmt.Fprintf(stdout, "  unknown area %s: %s\n", commit.Area, commit.Title)
 				hasProblem = true
 			}
 			for _, path := range verdict.WherePaths(commit.Body) {

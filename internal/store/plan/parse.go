@@ -9,6 +9,9 @@ import (
 // prTypes are the Conventional Commits types a PR may use.
 var prTypes = []string{"feat", "fix", "test", "docs", "refactor", "chore"}
 
+// Areas are the words a unit's "[repo/area]" tag may use after the slash.
+var Areas = []string{"front", "back", "cli", "sql", "infra", "config", "docs", "test", "none"}
+
 // marks maps each reading mark written before a PR's type to its Mark.
 var marks = map[string]Mark{"🤖": MarkAuto, "📄": MarkReadPR, "👤": MarkPerson}
 
@@ -66,8 +69,9 @@ func Parse(text string) []PR {
 		if !underTypedPR {
 			continue
 		}
-		if title, ok := strings.CutPrefix(line, "- [ ] "); ok {
-			current = &Commit{Title: title, Body: line + "\n"}
+		if taggedTitle, ok := strings.CutPrefix(line, "- [ ] "); ok {
+			repo, area, title := splitTag(taggedTitle)
+			current = &Commit{Repo: repo, Area: area, Title: title, Body: "- [ ] " + title + "\n"}
 			continue
 		}
 		last := &planPRs[len(planPRs)-1]
@@ -116,6 +120,20 @@ func parsePRLine(line string) (PR, bool) {
 		Title: rest[:open],
 		Slug:  rest[open+2 : len(rest)-1],
 	}, true
+}
+
+// splitTag splits "[blog-v2/back] add GET /github/kinds" into "blog-v2", "back" and "add GET /github/kinds".
+// A title that does not start with "[repo/area] " comes back whole, with repo and area empty.
+func splitTag(title string) (repo, area, rest string) {
+	if !strings.HasPrefix(title, "[") {
+		return "", "", title
+	}
+	tag, rest, isClosed := strings.Cut(title[1:], "] ")
+	if !isClosed || strings.Count(tag, "/") != 1 {
+		return "", "", title
+	}
+	repo, area, _ = strings.Cut(tag, "/")
+	return repo, area, rest
 }
 
 // isIndented reports whether line starts with a space or a tab.

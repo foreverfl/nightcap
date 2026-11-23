@@ -37,15 +37,23 @@ func (planPR PR) IsPerson() bool {
 
 // Commit is one open "- [ ]" under a PR; it becomes one commit.
 type Commit struct {
-	Title   string
-	Body    string // the checkbox line plus its indented lines, fences included
+	Repo    string // from the title's "[repo/area]" tag, e.g. "blog-v2"; empty without a tag
+	Area    string // from the same tag, e.g. "back"; empty without a tag
+	Title   string // the title with the tag taken off
+	Body    string // the checkbox line, tag taken off, plus its indented lines, fences included
 	HasTest bool   // the DONE line names a check, so a night run may take it
 }
 
 // Meta is the plan file's frontmatter: which repo the plan runs in and how its commits are tested.
 type Meta struct {
-	Repo         string   `yaml:"repo"`         // a leading "~/" is expanded to the home folder
-	Test         string   `yaml:"test"`         // shell command that proves a commit, such as make check
-	Protected    []string `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
-	Dependencies []string `yaml:"dependencies"` // dependency file globs the agent may not touch
+	Repo         string       `yaml:"repo"`         // a leading "~/" is expanded to the home folder
+	Test         TestCommands `yaml:"test"`         // shell command that proves a commit, such as make check
+	Protected    []string     `yaml:"protected"`    // contract file globs the agent may add but not edit or delete
+	Dependencies []string     `yaml:"dependencies"` // dependency file globs the agent may not touch
+}
+
+// TestCommands is the frontmatter's test: one command for every area, or one command per area.
+type TestCommands struct {
+	All    string            // test: make check
+	ByArea map[string]string // test: {back: cargo test, front: npm test}
 }
