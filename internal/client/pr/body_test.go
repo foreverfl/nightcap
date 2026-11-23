@@ -47,11 +47,11 @@ func riskSection(body string) string {
 }
 
 func TestBuildBodyListsRiskLines(t *testing.T) {
-	body, err := BuildBody(BodyInput{Risks: []string{"env: internal/feed/client.go"}})
+	body, err := BuildBody(BodyInput{Risks: []string{"환경 변수 읽음: internal/feed/client.go"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if risk := riskSection(body); risk != "- env: internal/feed/client.go\n" {
+	if risk := riskSection(body); risk != "- 환경 변수 읽음: internal/feed/client.go\n" {
 		t.Fatalf("the risk section should hold the one risk line, got %q", risk)
 	}
 }
@@ -61,7 +61,7 @@ func TestBuildBodyWithNothingRiskySaysNone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if risk := riskSection(body); risk != "- none\n" {
+	if risk := riskSection(body); risk != "- 없음\n" {
 		t.Fatalf("with nothing risky the risk section should say none, got %q", risk)
 	}
 }
@@ -72,7 +72,7 @@ func TestBuildBilingualBodyWithoutTranslationSaysEnglishIsMissing(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if risk := riskSection(body); risk != "- no English block\n" {
+	if risk := riskSection(body); risk != "- 영어 블록 없음(번역 실패)\n" {
 		t.Fatalf("a failed translation should leave only no English block in the risk section, got %q", risk)
 	}
 }
@@ -98,7 +98,7 @@ func TestBuildBodyWhenClaudeFailedTheReviewOrderWarnsInTheRiskSection(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if risk := riskSection(body); risk != "- no review order\n" {
+	if risk := riskSection(body); risk != "- 읽는 순서 없음\n" {
 		t.Fatalf("a failed review order should leave only no review order in the risk section, got %q", risk)
 	}
 }
