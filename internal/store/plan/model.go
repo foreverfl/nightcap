@@ -37,8 +37,10 @@ func (planPR PR) IsPerson() bool {
 
 // Commit is one open "- [ ]" under a PR; it becomes one commit.
 type Commit struct {
-	Title   string
-	Body    string // the checkbox line plus its indented lines, fences included
+	Repo    string // from the title's "[repo/area]" tag, e.g. "blog-v2"; empty without a tag
+	Area    string // from the same tag, e.g. "back"; empty without a tag
+	Title   string // the title with the tag taken off
+	Body    string // the checkbox line, tag taken off, plus its indented lines, fences included
 	HasTest bool   // the DONE line names a check, so a night run may take it
 }
 
